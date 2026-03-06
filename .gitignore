@@ -1,0 +1,31 @@
+# Environment secrets
+.env
+
+# Large pre-downloaded binaries (download via bin/fetch-binaries.sh)
+bin/data/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+terraform.tfvars
+*.tfplan
+kubeconfig*.yaml
+
+# TLS certificates (generated per-environment)
+certs/*.pem
+certs/*.key
+certs/*.crt
+certs/*.srl
+!certs/.gitkeep
+
+# Environment secrets (subdirectory)
+env/*.env
+!env/*.env.example
+
+# Claude Code
+.claude/
+
+# Design docs (generated per-session)
+docs/plans/

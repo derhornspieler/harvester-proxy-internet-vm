@@ -1,0 +1,28 @@
+# Airgap Helm chart manifest — HTTP repos synced to Harbor as OCI via helm-sync
+#
+# FORMAT: TYPE|SOURCE|VERSION|HARBOR_PROJECT|CHART_NAME|ENV_VAR
+#
+# TYPE:           http (Helm HTTP repo)
+# SOURCE:         Helm repo URL
+# VERSION:        Chart version (use "latest" to discover latest)
+# HARBOR_PROJECT: Harbor project name (matches source FQDN)
+# CHART_NAME:     Chart name within the repo
+# ENV_VAR:        Environment variable name for AIRGAPPED=true
+#
+# OCI-native charts (ghcr.io, docker.io, public.ecr.aws, etc.) are handled
+# by Harbor's built-in proxy-cache and do not need entries here.
+# To add a new OCI registry, create a registry endpoint + proxy-cache project
+# in Harbor via the API or UI.
+#
+# HTTP repos (proxied via charts.example.com, synced to Harbor as OCI)
+http|https://charts.jetstack.io|v1.19.3|charts.jetstack.io|cert-manager|HELM_OCI_CERT_MANAGER
+http|https://cloudnative-pg.github.io/charts|0.27.1|cloudnative-pg.github.io|cloudnative-pg|HELM_OCI_CNPG
+http|https://kubernetes.github.io/autoscaler|latest|kubernetes.github.io|cluster-autoscaler|HELM_OCI_CLUSTER_AUTOSCALER
+http|https://ot-container-kit.github.io/helm-charts/|latest|ot-container-kit.github.io|redis-operator|HELM_OCI_REDIS_OPERATOR
+http|https://helm.releases.hashicorp.com|0.32.0|helm.releases.hashicorp.com|vault|HELM_OCI_VAULT
+http|https://helm.goharbor.io|1.18.2|helm.goharbor.io|harbor|HELM_OCI_HARBOR
+http|https://prometheus-community.github.io/helm-charts|72.6.2|prometheus-community.github.io|kube-prometheus-stack|HELM_OCI_KPS
+http|https://helm.kasmweb.com/|1.1181.0|helm.kasmweb.com|kasm|HELM_OCI_KASM
+http|https://charts.gitlab.io|latest|charts.gitlab.io|gitlab-runner|HELM_OCI_GITLAB_RUNNER
+http|https://charts.external-secrets.io|latest|charts.external-secrets.io|external-secrets|HELM_OCI_EXTERNAL_SECRETS
+http|https://mariadb-operator.github.io/mariadb-operator|latest|mariadb-operator.github.io|mariadb-operator|HELM_OCI_MARIADB_OPERATOR
