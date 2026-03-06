@@ -73,6 +73,7 @@ SANS=(
   "dl.${DOMAIN}"
   "charts.${DOMAIN}"
   "bin.${DOMAIN}"
+  "harbor.${DOMAIN}"
 )
 
 # Idempotency check — skip if all certs exist and are valid

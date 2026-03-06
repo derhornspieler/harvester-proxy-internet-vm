@@ -27,7 +27,7 @@ graph LR
         DL[Cloud Images<br/>qcow2, ISOs]
     end
 
-    subgraph Harbor["Harbor (External)"]
+    subgraph Harbor["Harbor (External or Co-located)"]
         OCI[OCI Artifact Storage<br/>charts.jetstack.io/cert-manager]
         PC[Proxy-Cache<br/>ghcr.io, docker.io, ...]
     end
@@ -44,17 +44,17 @@ graph LR
     style PC fill:#e76f51,color:#fff
 ```
 
-> **Harbor is external** — it does not run on the proxy. The proxy only runs nginx, the helm-sync sidecar, and an optional bootstrap Docker registry.
+> **Harbor** can be **external** (separate infrastructure) or **co-located** (installed on the same VM using Harbor's official installer, with nginx providing TLS termination).
 
-### VM Deployment (docker-compose)
+### VM Deployment — External Harbor
 
 ```mermaid
 graph TB
     subgraph VM["Proxy VM"]
         subgraph DC["docker-compose"]
-            N443["nginx:443<br/>TLS termination + caching"]
-            HSC["helm-sync:8888<br/>ncat listener"]
-            R5000["registry:5000<br/>Docker Distribution v2"]
+            N443["nginx :443<br/>TLS termination + caching"]
+            HSC["helm-sync :8888<br/>ncat listener"]
+            R5000["registry :5000<br/>Docker Distribution v2"]
         end
         CERTS["TLS certs<br/>*.DOMAIN leaf"]
         CACHE["Docker volumes<br/>rpm, charts, downloads"]
@@ -71,6 +71,44 @@ graph TB
     style HSC fill:#264653,color:#fff
     style EXT_HARBOR fill:#e76f51,color:#fff
 ```
+
+### VM Deployment — Co-located Harbor
+
+```mermaid
+graph TB
+    subgraph VM["Proxy VM"]
+        subgraph DC["docker-compose (proxy stack)"]
+            N443["nginx :443<br/>TLS termination + caching"]
+            HSC["helm-sync :8888<br/>ncat listener"]
+            R5000["registry :5000<br/>Docker Distribution v2"]
+        end
+
+        subgraph HarborStack["Harbor (official installer)"]
+            HCORE["harbor-core :8080"]
+            HDB["PostgreSQL"]
+            HREDIS["Redis"]
+            HREG["Harbor Registry"]
+            HTRIVY["Trivy Scanner"]
+        end
+
+        CERTS["TLS certs<br/>*.DOMAIN + harbor.DOMAIN"]
+        CACHE["Docker volumes<br/>rpm, charts, downloads"]
+    end
+
+    N443 ---|docker DNS| HSC
+    N443 ---|"harbor.DOMAIN<br/>proxy_pass :8080"| HCORE
+    N443 --- CERTS
+    N443 --- CACHE
+    HCORE --- HDB & HREDIS & HREG
+    HSC -->|helm push<br/>via nginx| N443
+
+    style N443 fill:#2d6a4f,color:#fff
+    style HSC fill:#264653,color:#fff
+    style HCORE fill:#e76f51,color:#fff
+    style HREG fill:#e76f51,color:#fff
+```
+
+> **Co-located mode**: Harbor's official installer runs its own docker-compose stack on the same VM. nginx provides TLS termination at `harbor.$DOMAIN` and proxies to Harbor's HTTP port 8080. Run `./scripts/install-harbor.sh` to set this up.
 
 ### Kubernetes Deployment (Helm chart)
 
@@ -102,13 +140,13 @@ graph TB
     HS8888 --- CM
     R5000K --- RPVC
 
-    EXT_HARBOR2["Harbor (external)"]
-    HS8888 -->|helm push| EXT_HARBOR2
+    HARBOR["Harbor<br/>(external or in-cluster)"]
+    HS8888 -->|helm push| HARBOR
 
     style ING fill:#457b9d,color:#fff
     style N8080 fill:#2d6a4f,color:#fff
     style HS8888 fill:#264653,color:#fff
-    style EXT_HARBOR2 fill:#e76f51,color:#fff
+    style HARBOR fill:#e76f51,color:#fff
 ```
 
 ## How It Works
@@ -198,7 +236,9 @@ flowchart LR
 
 - **Docker** with Compose plugin (v2)
 - **openssl** for certificate generation
-- **Harbor** instance (external — for OCI chart storage and proxy-cache)
+- **Harbor** instance — either:
+  - **External**: existing Harbor on separate infrastructure, or
+  - **Co-located**: installed on the same VM via `./scripts/install-harbor.sh`
 - A **root CA** certificate and key (for generating the proxy's intermediate CA)
 - DNS or `/etc/hosts` entries pointing `*.$DOMAIN` to the proxy VM
 
@@ -222,7 +262,7 @@ vi .env                            # Set your domain, Harbor creds, etc.
 
 # 5. Add /etc/hosts entries (or configure DNS)
 DOMAIN=$(grep DOMAIN .env | cut -d= -f2)
-echo "127.0.0.1  yum.${DOMAIN} apt.${DOMAIN} dl.${DOMAIN} charts.${DOMAIN} bin.${DOMAIN}" \
+echo "127.0.0.1  yum.${DOMAIN} apt.${DOMAIN} dl.${DOMAIN} charts.${DOMAIN} bin.${DOMAIN} harbor.${DOMAIN}" \
   | sudo tee -a /etc/hosts
 
 # 6. Trust the CA
@@ -252,6 +292,24 @@ cp terraform.tfvars.example terraform.tfvars
 vi terraform.tfvars
 terraform init && terraform apply
 ```
+
+#### Co-located Harbor (Optional)
+
+If you don't have an external Harbor instance, install one on the same VM:
+
+```bash
+# Install Harbor (downloads official offline installer)
+./scripts/install-harbor.sh
+
+# Set HARBOR_HOST to the local Harbor
+sed -i 's/^HARBOR_HOST=.*/HARBOR_HOST=harbor.yourdomain.com/' .env
+
+# Reconfigure and restart
+./scripts/configure.sh
+docker compose restart nginx
+```
+
+Harbor runs its own docker-compose stack on port 8080. nginx proxies `harbor.$DOMAIN` with TLS termination. The `harbor.conf` vhost is included by default — if Harbor isn't running, it simply returns 502 on that vhost (other vhosts are unaffected).
 
 ### Option B: Kubernetes (Helm Chart)
 
@@ -328,7 +386,8 @@ After changing `.env`, run `./scripts/configure.sh` to apply the domain to nginx
 │   │   ├── apt.conf                # Debian / Ubuntu APT repos
 │   │   ├── dl.conf                 # Cloud images (qcow2, ISOs)
 │   │   ├── charts.conf             # 11 Helm HTTP chart repos (with mirror)
-│   │   └── bin.conf                # Static binary files
+│   │   ├── bin.conf                # Static binary files
+│   │   └── harbor.conf             # Co-located Harbor reverse proxy (optional)
 │   └── includes/
 │       ├── ssl-defaults.conf       # Shared TLS settings
 │       ├── proxy-defaults.conf     # Shared proxy headers/timeouts
@@ -355,7 +414,8 @@ After changing `.env`, run `./scripts/configure.sh` to apply the domain to nginx
 │
 ├── scripts/
 │   ├── configure.sh                # Apply .env settings to config files
-│   └── generate-secrets.sh         # Generate random credentials
+│   ├── generate-secrets.sh         # Generate random credentials
+│   └── install-harbor.sh           # Install co-located Harbor (optional)
 │
 ├── terraform/                      # Harvester VM provisioning (optional)
 │   ├── main.tf                     # Cloud-init + VM resource
@@ -376,7 +436,7 @@ After changing `.env`, run `./scripts/configure.sh` to apply the domain to nginx
 
 ### nginx (Reverse Proxy)
 
-Five virtual hosts behind TLS, all sharing the same multi-SAN certificate:
+Six virtual hosts behind TLS, all sharing the same multi-SAN certificate:
 
 | Virtual Host | Upstream | Cache |
 |-------------|----------|-------|
@@ -385,6 +445,7 @@ Five virtual hosts behind TLS, all sharing the same multi-SAN certificate:
 | `dl.$DOMAIN` | Rocky 9 cloud images (qcow2) | 30 GB, 30-day TTL |
 | `charts.$DOMAIN` | 11 Helm HTTP chart repos (see below) | 2 GB, 1-day TTL |
 | `bin.$DOMAIN` | Pre-downloaded GitHub release binaries (static) | Client-side only |
+| `harbor.$DOMAIN` | Co-located Harbor instance (localhost:8080) | — (pass-through) |
 
 ### helm-sync (Sidecar)
 
@@ -538,7 +599,7 @@ Save the returned `secret` as `HARBOR_PASS` in your `.env`. The username will be
 Root CA (offline, long-lived)
 └── Proxy Intermediate CA (5yr, RSA-4096, pathlen:0)
     └── *.$DOMAIN leaf (1yr, ECDSA P-256)
-        SANs: yum, apt, dl, charts, bin
+        SANs: yum, apt, dl, charts, bin, harbor
 ```
 
 The CA chain (`certs/ca-chain.pem`) must be trusted by all clients. For Kubernetes nodes, inject it via cloud-init or distribute it as part of your node provisioning.

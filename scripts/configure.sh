@@ -27,6 +27,11 @@ echo ""
 find "${PROJECT_DIR}/nginx" -name '*.conf' -exec \
     sed -i "s/example\.com/${DOMAIN}/g" {} +
 
+# Replace harbor host in harbor.conf if HARBOR_HOST differs from default
+if [[ -f "${PROJECT_DIR}/nginx/conf.d/harbor.conf" && "$HARBOR_HOST" != "harbor.${DOMAIN}" ]]; then
+    sed -i "s/harbor\.${DOMAIN}/${HARBOR_HOST}/g" "${PROJECT_DIR}/nginx/conf.d/harbor.conf"
+fi
+
 # Replace domain in helm manifest
 sed -i "s/charts\.example\.com/charts.${DOMAIN}/g" \
     "${PROJECT_DIR}/helm-oci/charts.manifest"
