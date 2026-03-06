@@ -173,8 +173,8 @@ handle_connection() {
         esac
     done
 
-    local method path _rest
-    read -r method path _rest <<< "$first_line"
+    local _method path _rest
+    read -r _method path _rest <<< "$first_line"
 
     case "$path" in
         /sync)

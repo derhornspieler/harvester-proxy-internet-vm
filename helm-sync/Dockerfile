@@ -1,5 +1,8 @@
 FROM alpine:3.21
 
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+
+# hadolint ignore=DL3018
 RUN apk add --no-cache \
         bash \
         ca-certificates \
@@ -17,9 +20,8 @@ RUN apk add --no-cache \
 
 COPY helm-sync.sh /opt/helm-sync/helm-sync.sh
 COPY entrypoint.sh /opt/helm-sync/entrypoint.sh
-RUN chmod +x /opt/helm-sync/helm-sync.sh /opt/helm-sync/entrypoint.sh
-
-RUN mkdir -p /var/log/helm-sync /tmp/helm-sync-locks
+RUN chmod +x /opt/helm-sync/helm-sync.sh /opt/helm-sync/entrypoint.sh \
+    && mkdir -p /var/log/helm-sync /tmp/helm-sync-locks
 
 EXPOSE 8888
 
