@@ -74,6 +74,12 @@ SANS=(
   "charts.${DOMAIN}"
   "bin.${DOMAIN}"
   "harbor.${DOMAIN}"
+  "go.${DOMAIN}"
+  "npm.${DOMAIN}"
+  "pypi.${DOMAIN}"
+  "maven.${DOMAIN}"
+  "crates.${DOMAIN}"
+  "proxy.${DOMAIN}"
 )
 
 # Idempotency check — skip if all certs exist and are valid

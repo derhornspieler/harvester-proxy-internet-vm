@@ -144,7 +144,7 @@ REMOTE_SCRIPT
 
 # ---- Step 5: Add /etc/hosts entries on proxy VM ----
 log_info "Adding /etc/hosts entries on proxy VM..."
-HOSTS_ENTRY="127.0.0.1  yum.${DOMAIN} apt.${DOMAIN} dl.${DOMAIN} charts.${DOMAIN} bin.${DOMAIN}"
+HOSTS_ENTRY="127.0.0.1  yum.${DOMAIN} apt.${DOMAIN} dl.${DOMAIN} charts.${DOMAIN} bin.${DOMAIN} go.${DOMAIN} npm.${DOMAIN} pypi.${DOMAIN} maven.${DOMAIN} crates.${DOMAIN}"
 ${SSH_CMD} bash -s <<REMOTE_SCRIPT
 set -euo pipefail
 if ! grep -q "yum.${DOMAIN}" /etc/hosts; then
@@ -166,13 +166,15 @@ set -euo pipefail
 for i in $(seq 1 30); do
   nginx_ok=false
   registry_ok=false
+  squid_ok=false
   docker inspect --format='{{.State.Health.Status}}' airgap-nginx 2>/dev/null | grep -q healthy && nginx_ok=true
   docker inspect --format='{{.State.Health.Status}}' airgap-registry 2>/dev/null | grep -q healthy && registry_ok=true
-  if $nginx_ok && $registry_ok; then
+  docker inspect --format='{{.State.Health.Status}}' airgap-squid 2>/dev/null | grep -q healthy && squid_ok=true
+  if $nginx_ok && $registry_ok && $squid_ok; then
     echo "All services healthy"
     exit 0
   fi
-  echo "  Waiting... (nginx=$nginx_ok registry=$registry_ok)"
+  echo "  Waiting... (nginx=$nginx_ok registry=$registry_ok squid=$squid_ok)"
   sleep 2
 done
 echo "WARNING: Services did not become healthy within 60s"
@@ -182,7 +184,7 @@ REMOTE_SCRIPT
 
 # ---- Step 8: Add /etc/hosts on local dev VM ----
 log_info "Adding /etc/hosts entries on local dev VM..."
-LOCAL_HOSTS="${PROXY_IP}  yum.${DOMAIN} apt.${DOMAIN} dl.${DOMAIN} charts.${DOMAIN} bin.${DOMAIN}"
+LOCAL_HOSTS="${PROXY_IP}  yum.${DOMAIN} apt.${DOMAIN} dl.${DOMAIN} charts.${DOMAIN} bin.${DOMAIN} go.${DOMAIN} npm.${DOMAIN} pypi.${DOMAIN} maven.${DOMAIN} crates.${DOMAIN} proxy.${DOMAIN}"
 if ! grep -q "yum.${DOMAIN}" /etc/hosts; then
   echo "$LOCAL_HOSTS" | sudo tee -a /etc/hosts >/dev/null
   log_ok "Added local /etc/hosts entries"
@@ -199,6 +201,12 @@ log_info "  APT repos:       https://apt.${DOMAIN}"
 log_info "  Cloud images:    https://dl.${DOMAIN}"
 log_info "  Helm charts:     https://charts.${DOMAIN}"
 log_info "  Binaries:        https://bin.${DOMAIN}"
+log_info "  Go modules:      https://go.${DOMAIN}"
+log_info "  npm packages:    https://npm.${DOMAIN}"
+log_info "  PyPI packages:   https://pypi.${DOMAIN}"
+log_info "  Maven artifacts: https://maven.${DOMAIN}"
+log_info "  Rust crates:     https://crates.${DOMAIN}"
+log_info "  HTTP proxy:      http://proxy.${DOMAIN}:3128"
 log_info "  Registry:        ${PROXY_IP}:5000"
 echo ""
 log_info "CA chain:          certs/ca-chain.pem"

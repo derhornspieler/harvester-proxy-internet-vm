@@ -15,6 +15,11 @@ services:
       - nginx-cache-rpm:/var/cache/nginx/rpm
       - nginx-cache-charts:/var/cache/nginx/charts
       - nginx-cache-downloads:/var/cache/nginx/downloads
+      - nginx-cache-go:/var/cache/nginx/go
+      - nginx-cache-npm:/var/cache/nginx/npm
+      - nginx-cache-pypi:/var/cache/nginx/pypi
+      - nginx-cache-maven:/var/cache/nginx/maven
+      - nginx-cache-crates:/var/cache/nginx/crates
     depends_on:
       helm-sync:
         condition: service_started
@@ -24,6 +29,22 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+
+  squid:
+    image: ubuntu/squid:latest
+    container_name: airgap-squid
+    restart: unless-stopped
+    ports:
+      - "3128:3128"
+    volumes:
+      - ./squid/squid.conf:/etc/squid/squid.conf:ro
+      - squid-cache:/var/spool/squid
+    healthcheck:
+      test: ["CMD-SHELL", "squidclient -h 127.0.0.1 -p 3128 mgr:info | grep -q 'Squid Object Cache'"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   helm-sync:
     build: ./helm-sync
@@ -66,4 +87,10 @@ volumes:
   nginx-cache-rpm:
   nginx-cache-charts:
   nginx-cache-downloads:
+  nginx-cache-go:
+  nginx-cache-npm:
+  nginx-cache-pypi:
+  nginx-cache-maven:
+  nginx-cache-crates:
+  squid-cache:
   registry-data:

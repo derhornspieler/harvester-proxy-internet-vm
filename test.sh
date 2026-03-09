@@ -192,7 +192,67 @@ else
   skip_test "Binary static files (bin/data/ empty — run bin/fetch-binaries.sh)"
 fi
 
-# ---- 7. Bootstrap Registry ----
+# ---- 7. Go Module Proxy ----
+echo ""
+echo -e "${BOLD}--- go.${DOMAIN} (Go Module Proxy) ---${NC}"
+
+run_test "Go module list (golang.org/x/text)" bash -c "
+  ccurl 'https://go.${DOMAIN}/golang.org/x/text/@v/list' | grep -q 'v'
+"
+
+run_test "Go module info" bash -c "
+  ccurl 'https://go.${DOMAIN}/golang.org/x/text/@latest' | grep -q 'Version'
+"
+
+run_test "Go sum database (latest)" bash -c "
+  ccurl 'https://go.${DOMAIN}/sumdb/sum.golang.org/latest' | grep -q 'go.sum database'
+"
+
+# ---- 8. npm Registry Proxy ----
+echo ""
+echo -e "${BOLD}--- npm.${DOMAIN} (npm Registry Proxy) ---${NC}"
+
+run_test "npm package metadata (express)" bash -c "
+  ccurl 'https://npm.${DOMAIN}/express/latest' | grep -q 'name'
+"
+
+# ---- 9. PyPI Proxy ----
+echo ""
+echo -e "${BOLD}--- pypi.${DOMAIN} (PyPI Proxy) ---${NC}"
+
+run_test "PyPI simple index (requests)" bash -c "
+  ccurl 'https://pypi.${DOMAIN}/simple/requests/' | grep -q 'requests'
+"
+
+# ---- 10. Maven Proxy ----
+echo ""
+echo -e "${BOLD}--- maven.${DOMAIN} (Maven Proxy) ---${NC}"
+
+run_test "Maven Central artifact metadata" bash -c "
+  ccurl 'https://maven.${DOMAIN}/maven2/org/apache/commons/commons-lang3/maven-metadata.xml' | grep -q '<artifactId>'
+"
+
+# ---- 11. Crates Proxy ----
+echo ""
+echo -e "${BOLD}--- crates.${DOMAIN} (Rust Crates Proxy) ---${NC}"
+
+run_test "Crates.io sparse index (serde)" bash -c "
+  ccurl 'https://crates.${DOMAIN}/api/v1/crates/se/rd/serde' | grep -q 'serde'
+"
+
+# ---- 12. Forward Proxy (Squid) ----
+echo ""
+echo -e "${BOLD}--- proxy.${DOMAIN}:3128 (Forward HTTP Proxy) ---${NC}"
+
+run_test "HTTP proxy reachable" bash -c "
+  curl -x 'http://${PROXY_IP}:3128' --connect-timeout 10 -sfS -o /dev/null 'http://httpbin.org/get'
+"
+
+run_test "HTTPS via CONNECT tunnel" bash -c "
+  curl -x 'http://${PROXY_IP}:3128' --connect-timeout 10 -sfS -o /dev/null 'https://httpbin.org/get'
+"
+
+# ---- 13. Bootstrap Registry ----
 echo ""
 echo -e "${BOLD}--- Bootstrap Registry (${PROXY_IP}:5000) ---${NC}"
 
@@ -204,7 +264,7 @@ run_test "Registry catalog endpoint" bash -c "
   curl --cacert '${CA_CERT}' -k --connect-timeout 10 --max-time 30 -sfS 'https://${PROXY_IP}:5000/v2/_catalog' | grep -q 'repositories'
 "
 
-# ---- 8. Terraform Provider Mirror ----
+# ---- 14. Terraform Provider Mirror ----
 echo ""
 echo -e "${BOLD}--- Terraform Provider Mirror ---${NC}"
 
@@ -214,7 +274,7 @@ else
   run_test "${HOME}/.terraformrc has filesystem_mirror" false
 fi
 
-# ---- 9. validate_airgapped_prereqs() simulation ----
+# ---- 15. validate_airgapped_prereqs() simulation ----
 echo ""
 echo -e "${BOLD}--- validate_airgapped_prereqs() Dry Run ---${NC}"
 
