@@ -12,6 +12,7 @@ graph LR
         C1[helm pull / repo add]
         C2[yum install / apt-get]
         C3[curl / wget]
+        C4[go build / npm install<br/>pip install / cargo build]
     end
 
     subgraph Proxy["Proxy (VM or K8s Pod)"]
@@ -25,6 +26,7 @@ graph LR
         HR[Helm HTTP Repos<br/>jetstack, hashicorp, ...]
         RPM[RPM / APT Repos<br/>Rocky, EPEL, Debian]
         DL[Cloud Images<br/>qcow2, ISOs]
+        PKG[Language Registries<br/>Go, npm, PyPI, Maven, crates.io]
     end
 
     subgraph Harbor["Harbor (External or Co-located)"]
@@ -32,8 +34,8 @@ graph LR
         PC[Proxy-Cache<br/>ghcr.io, docker.io, ...]
     end
 
-    C1 & C2 & C3 -->|HTTPS| NG
-    NG -->|proxy_pass| HR & RPM & DL
+    C1 & C2 & C3 & C4 -->|HTTPS| NG
+    NG -->|proxy_pass| HR & RPM & DL & PKG
     NG -.->|mirror<br/>fire-and-forget| HS
     HS -->|helm push<br/>OCI artifact| OCI
     C1 -->|helm pull oci://| PC
@@ -55,9 +57,10 @@ graph TB
             N443["nginx :443<br/>TLS termination + caching"]
             HSC["helm-sync :8888<br/>ncat listener"]
             R5000["registry :5000<br/>Docker Distribution v2"]
+            SQ["squid :3128<br/>forward HTTP/HTTPS proxy"]
         end
         CERTS["TLS certs<br/>*.DOMAIN leaf"]
-        CACHE["Docker volumes<br/>rpm, charts, downloads"]
+        CACHE["Docker volumes<br/>rpm, charts, downloads,<br/>go, npm, pypi, maven, crates"]
     end
 
     N443 ---|docker DNS| HSC
@@ -69,6 +72,7 @@ graph TB
 
     style N443 fill:#2d6a4f,color:#fff
     style HSC fill:#264653,color:#fff
+    style SQ fill:#457b9d,color:#fff
     style EXT_HARBOR fill:#e76f51,color:#fff
 ```
 
@@ -425,18 +429,21 @@ After changing `.env`, run `./scripts/configure.sh` to apply the domain to nginx
 │   ├── providers.tf                # Harvester provider config
 │   └── fetch-providers.sh          # Download providers for offline use
 │
+├── squid/
+│   └── squid.conf                  # Squid forward HTTP/HTTPS proxy config
+│
 ├── env/
 │   └── airgap.env.example          # Full .env template for AIRGAPPED=true deployments
 │
 ├── setup-proxy-vm.sh               # Provision remote VM via SSH
-└── test.sh                         # End-to-end verification (24 tests)
+└── test.sh                         # End-to-end verification (30 tests)
 ```
 
 ## Components
 
 ### nginx (Reverse Proxy)
 
-Six virtual hosts behind TLS, all sharing the same multi-SAN certificate:
+Twelve virtual hosts behind TLS, all sharing the same multi-SAN certificate:
 
 | Virtual Host | Upstream | Cache |
 |-------------|----------|-------|
@@ -446,6 +453,11 @@ Six virtual hosts behind TLS, all sharing the same multi-SAN certificate:
 | `charts.$DOMAIN` | 11 Helm HTTP chart repos (see below) | 2 GB, 1-day TTL |
 | `bin.$DOMAIN` | Pre-downloaded GitHub release binaries (static) | Client-side only |
 | `harbor.$DOMAIN` | Co-located Harbor instance (localhost:8080) | — (pass-through) |
+| `go.$DOMAIN` | proxy.golang.org + sum.golang.org | 5 GB, 30-day TTL |
+| `npm.$DOMAIN` | registry.npmjs.org | 10 GB, 30-day TTL |
+| `pypi.$DOMAIN` | pypi.org + files.pythonhosted.org | 10 GB, 30-day TTL |
+| `maven.$DOMAIN` | repo1.maven.org + maven.google.com + plugins.gradle.org | 10 GB, 30-day TTL |
+| `crates.$DOMAIN` | crates.io sparse index + static.crates.io | 5 GB, 30-day TTL |
 
 ### helm-sync (Sidecar)
 
@@ -462,6 +474,31 @@ Lightweight bash HTTP server using `ncat`. Listens on port 8888.
 - `/mirror-sync` is an `internal` location that proxies to `helm-sync:8888/sync`
 - Timeouts are 1s — nginx never blocks waiting for the sidecar
 - The sidecar runs `sync_chart()` in the background (`&`) so ncat can accept the next connection
+
+### Language Package Proxies
+
+Caching reverse proxies for language-specific package registries. Configure your build tools to use these instead of public registries.
+
+| Language | Virtual Host | Usage |
+|----------|-------------|-------|
+| Go | `go.$DOMAIN` | `GOPROXY=https://go.$DOMAIN,direct` |
+| Node.js | `npm.$DOMAIN` | `npm config set registry https://npm.$DOMAIN/` |
+| Python | `pypi.$DOMAIN` | `pip install --index-url https://pypi.$DOMAIN/simple/` |
+| Java | `maven.$DOMAIN` | `<mirror><url>https://maven.$DOMAIN/maven2/</url></mirror>` |
+| Rust | `crates.$DOMAIN` | `[source.internal] registry = "sparse+https://crates.$DOMAIN/api/v1/crates/"` |
+
+### Squid Forward Proxy
+
+Generic HTTP/HTTPS forward proxy for workloads that need direct internet access. Runs on port 3128, supports `CONNECT` tunneling for HTTPS.
+
+```bash
+# Usage
+export HTTP_PROXY=http://proxy.$DOMAIN:3128
+export HTTPS_PROXY=http://proxy.$DOMAIN:3128
+export NO_PROXY=localhost,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.$DOMAIN,.svc,.cluster.local
+```
+
+Access is restricted to RFC 1918 private networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`).
 
 ### Proxied Helm Chart Repos
 
@@ -599,7 +636,7 @@ Save the returned `secret` as `HARBOR_PASS` in your `.env`. The username will be
 Root CA (offline, long-lived)
 └── Proxy Intermediate CA (5yr, RSA-4096, pathlen:0)
     └── *.$DOMAIN leaf (1yr, ECDSA P-256)
-        SANs: yum, apt, dl, charts, bin, harbor
+        SANs: yum, apt, dl, charts, bin, harbor, go, npm, pypi, maven, crates, proxy
 ```
 
 The CA chain (`certs/ca-chain.pem`) must be trusted by all clients. For Kubernetes nodes, inject it via cloud-init or distribute it as part of your node provisioning.
@@ -626,6 +663,12 @@ All caches use named Docker volumes for persistence across container restarts.
 | RPM/APT | 20 GB | 7 days | 30 days | `nginx-cache-rpm` |
 | Helm charts | 2 GB | 1 day | 1 day | `nginx-cache-charts` |
 | Cloud images | 30 GB | 30 days | 30 days | `nginx-cache-downloads` |
+| Go modules | 5 GB | 7 days | 30 days | `nginx-cache-go` |
+| npm packages | 10 GB | 7 days | 30 days | `nginx-cache-npm` |
+| PyPI packages | 10 GB | 1/30 days | 30 days | `nginx-cache-pypi` |
+| Maven artifacts | 10 GB | 30 days | 30 days | `nginx-cache-maven` |
+| Rust crates | 5 GB | 1/30 days | 30 days | `nginx-cache-crates` |
+| Squid forward proxy | 10 GB | — | — | `squid-cache` |
 | Container images | Unlimited | — | — | `registry-data` |
 
 ## Troubleshooting
