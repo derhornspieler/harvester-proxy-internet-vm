@@ -1,0 +1,191 @@
+---
+# GitLab CI for harvester-proxy-internet-vm
+# Lint + security scan + validate + ArgoCD deployment
+
+stages:
+  - lint
+  - security
+  - validate
+  - deploy
+
+variables:
+  DOMAIN: example.com
+
+# ---------------------------------------------------------------------------
+# Lint stage
+# ---------------------------------------------------------------------------
+
+shellcheck:
+  stage: lint
+  image: koalaman/shellcheck-stable:latest
+  script:
+    - |
+      find . -name '*.sh' -not -path './.git/*' -print0 \
+        | xargs -0 shellcheck -S warning -e SC1090 -e SC1091
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+hadolint:
+  stage: lint
+  image: hadolint/hadolint:latest-alpine
+  script:
+    - hadolint helm-sync/Dockerfile
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+yamllint:
+  stage: lint
+  image: alpine:3.21
+  before_script:
+    - apk add --no-cache yamllint
+  script:
+    - |
+      yamllint -d '{extends: default, rules: {line-length: {max: 200}, truthy: {check-keys: false}}}' \
+        docker-compose.yaml registry/config.yml
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# ---------------------------------------------------------------------------
+# Security stage
+# ---------------------------------------------------------------------------
+
+gitleaks:
+  stage: security
+  image: zricethezav/gitleaks:latest
+  script:
+    - gitleaks detect --source . --verbose
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  allow_failure: false
+
+semgrep-sast:
+  stage: security
+  image: semgrep/semgrep:latest
+  script:
+    - >-
+      semgrep scan
+      --config auto
+      --config p/owasp-top-ten
+      --config p/docker
+      --config p/nginx
+      --error
+      --json -o semgrep-results.json .
+  artifacts:
+    when: always
+    paths:
+      - semgrep-results.json
+    expire_in: 30 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# ---------------------------------------------------------------------------
+# Validate stage
+# ---------------------------------------------------------------------------
+
+nginx-config:
+  stage: validate
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  script:
+    - mkdir -p /tmp/certs
+    - |
+      apk add --no-cache openssl
+      openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 \
+        -keyout /tmp/certs/server-key.pem -out /tmp/certs/server-fullchain.pem \
+        -days 1 -nodes -subj '/CN=test'
+    - |
+      docker run --rm \
+        -v "$PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+        -v "$PWD/nginx/conf.d:/etc/nginx/conf.d:ro" \
+        -v "$PWD/nginx/includes:/etc/nginx/includes:ro" \
+        -v "/tmp/certs/server-fullchain.pem:/etc/nginx/certs/server-fullchain.pem:ro" \
+        -v "/tmp/certs/server-key.pem:/etc/nginx/certs/server-key.pem:ro" \
+        nginx:1.27-alpine nginx -t
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+docker-compose:
+  stage: validate
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+    HARBOR_HOST: harbor.example.com
+    HARBOR_USER: ci-test
+    HARBOR_PASS: ci-test
+  script:
+    - docker compose config --quiet
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+helm-lint:
+  stage: validate
+  image: alpine/helm:3.17.1
+  script:
+    - helm lint chart/
+    - helm template test chart/ > /dev/null
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# ---------------------------------------------------------------------------
+# Deploy stage — ArgoCD ApplicationSet refresh
+# ---------------------------------------------------------------------------
+# ArgoCD watches the 'deploy' branch via the infra-platform-services
+# ApplicationSet (SCM provider generator). This job uses the ArgoCD API
+# to trigger an immediate refresh.
+# Credentials sourced from Vault (kv/ci/argocd) via GitLab JWT auth.
+
+argocd-refresh:
+  stage: deploy
+  image: alpine:3.21
+  id_tokens:
+    VAULT_ID_TOKEN:
+      aud: https://gitlab.aegisgroup.ch
+  secrets:
+    ARGOCD_SERVER:
+      vault: ci/argocd/server@kv
+    ARGOCD_USERNAME:
+      vault: ci/argocd/username@kv
+    ARGOCD_PASSWORD:
+      vault: ci/argocd/password@kv
+  variables:
+    VAULT_SERVER_URL: https://vault.aegisgroup.ch
+    VAULT_AUTH_ROLE: gitlab-ci
+  before_script:
+    - apk add --no-cache curl
+  script:
+    - |
+      ARGOCD_TOKEN=$(curl -sSf -k \
+        -X POST "https://${ARGOCD_SERVER}/api/v1/session" \
+        -H 'Content-Type: application/json' \
+        -d "{\"username\":\"${ARGOCD_USERNAME}\",\"password\":\"${ARGOCD_PASSWORD}\"}" \
+        | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+    - |
+      curl -sSf -k \
+        -X GET "https://${ARGOCD_SERVER}/api/v1/applicationsets/infra-platform-services" \
+        -H "Authorization: Bearer ${ARGOCD_TOKEN}" \
+        -o /dev/null
+    - echo "ArgoCD ApplicationSet refresh triggered"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  needs:
+    - nginx-config
+    - docker-compose
+    - helm-lint
+    - shellcheck
+    - hadolint
+    - yamllint
+    - gitleaks
+    - semgrep-sast

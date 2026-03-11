@@ -1,0 +1,64 @@
+---
+# ApplicationSet: auto-discover repos in infra_and_platform_services group
+# Matches repos with a 'deploy' branch containing chart/Chart.yaml (Helm)
+# Uses the Vault-backed argocd-gitlab-token ExternalSecret for auth
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: infra-platform-services
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  generators:
+    - scmProvider:
+        gitlab:
+          api: "http://gitlab-webservice-default.gitlab.svc:8181/"
+          group: "infra_and_platform_services"
+          includeSubgroups: false
+          allBranches: true
+          insecure: true
+          tokenRef:
+            secretName: argocd-gitlab-token
+            key: token
+        cloneProtocol: https
+        filters:
+          - branchMatch: "^deploy$"
+            pathsExist:
+              - chart/Chart.yaml
+        requeueAfterSeconds: 300
+  template:
+    metadata:
+      name: "{{ .repository }}"
+      namespace: argocd
+      labels:
+        app.kubernetes.io/managed-by: applicationset
+        app.kubernetes.io/part-of: infra-platform-services
+    spec:
+      project: default
+      source:
+        repoURL: "{{ .url }}"
+        targetRevision: deploy
+        path: chart/
+        helm:
+          valueFiles:
+            - values.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{ .repository }}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - RespectIgnoreDifferences=true
+      ignoreDifferences:
+        - group: ""
+          kind: Secret
+          jsonPointers:
+            - /data
+            - /metadata/labels
+            - /metadata/annotations
+            - /metadata/ownerReferences
