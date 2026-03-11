@@ -135,7 +135,7 @@ certManager:
 # --- Cilium ---
 cilium:
   egressGateway:
-    enabled: false
+    enabled: true
     egressIP: ""
     nodeSelector:
       kubernetes.io/os: linux
