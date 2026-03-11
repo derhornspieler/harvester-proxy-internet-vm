@@ -79,6 +79,7 @@ SANS=(
   "pypi.${DOMAIN}"
   "maven.${DOMAIN}"
   "crates.${DOMAIN}"
+  "apk.${DOMAIN}"
   "proxy.${DOMAIN}"
 )
 

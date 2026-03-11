@@ -135,16 +135,41 @@ fi
 
 # ---- Step 4: Trust the private CA on the proxy VM ----
 log_info "Installing private CA on proxy VM..."
-${SSH_CMD} bash -s <<REMOTE_SCRIPT
+${SSH_CMD} bash -s <<'REMOTE_SCRIPT'
 set -euo pipefail
-sudo cp ~/airgap-simulation/certs/ca-chain.pem /etc/pki/ca-trust/source/anchors/airgap-proxy-ca.pem
-sudo update-ca-trust
+CA_SRC=~/airgap-simulation/certs/ca-chain.pem
+if [[ -f /etc/os-release ]]; then
+  . /etc/os-release
+  case "${ID:-}" in
+    rocky|rhel|centos|fedora)
+      sudo cp "$CA_SRC" /etc/pki/ca-trust/source/anchors/airgap-proxy-ca.pem
+      sudo update-ca-trust
+      ;;
+    debian|ubuntu)
+      sudo cp "$CA_SRC" /usr/local/share/ca-certificates/airgap-proxy-ca.crt
+      sudo update-ca-certificates
+      ;;
+    alpine)
+      sudo apk add --no-cache ca-certificates
+      sudo cp "$CA_SRC" /usr/local/share/ca-certificates/airgap-proxy-ca.crt
+      sudo update-ca-certificates
+      ;;
+    *)
+      echo "Unknown distro ${ID:-}, attempting RHEL-style trust"
+      sudo cp "$CA_SRC" /etc/pki/ca-trust/source/anchors/airgap-proxy-ca.pem
+      sudo update-ca-trust
+      ;;
+  esac
+else
+  sudo cp "$CA_SRC" /etc/pki/ca-trust/source/anchors/airgap-proxy-ca.pem
+  sudo update-ca-trust
+fi
 echo "CA trust updated"
 REMOTE_SCRIPT
 
 # ---- Step 5: Add /etc/hosts entries on proxy VM ----
 log_info "Adding /etc/hosts entries on proxy VM..."
-HOSTS_ENTRY="127.0.0.1  yum.${DOMAIN} apt.${DOMAIN} dl.${DOMAIN} charts.${DOMAIN} bin.${DOMAIN} go.${DOMAIN} npm.${DOMAIN} pypi.${DOMAIN} maven.${DOMAIN} crates.${DOMAIN}"
+HOSTS_ENTRY="127.0.0.1  yum.${DOMAIN} apt.${DOMAIN} apk.${DOMAIN} dl.${DOMAIN} charts.${DOMAIN} bin.${DOMAIN} go.${DOMAIN} npm.${DOMAIN} pypi.${DOMAIN} maven.${DOMAIN} crates.${DOMAIN} proxy.${DOMAIN}"
 ${SSH_CMD} bash -s <<REMOTE_SCRIPT
 set -euo pipefail
 if ! grep -q "yum.${DOMAIN}" /etc/hosts; then
@@ -184,7 +209,7 @@ REMOTE_SCRIPT
 
 # ---- Step 8: Add /etc/hosts on local dev VM ----
 log_info "Adding /etc/hosts entries on local dev VM..."
-LOCAL_HOSTS="${PROXY_IP}  yum.${DOMAIN} apt.${DOMAIN} dl.${DOMAIN} charts.${DOMAIN} bin.${DOMAIN} go.${DOMAIN} npm.${DOMAIN} pypi.${DOMAIN} maven.${DOMAIN} crates.${DOMAIN} proxy.${DOMAIN}"
+LOCAL_HOSTS="${PROXY_IP}  yum.${DOMAIN} apt.${DOMAIN} apk.${DOMAIN} dl.${DOMAIN} charts.${DOMAIN} bin.${DOMAIN} go.${DOMAIN} npm.${DOMAIN} pypi.${DOMAIN} maven.${DOMAIN} crates.${DOMAIN} proxy.${DOMAIN}"
 if ! grep -q "yum.${DOMAIN}" /etc/hosts; then
   echo "$LOCAL_HOSTS" | sudo tee -a /etc/hosts >/dev/null
   log_ok "Added local /etc/hosts entries"
@@ -198,6 +223,7 @@ echo ""
 log_info "Services:"
 log_info "  RPM repos:       https://yum.${DOMAIN}"
 log_info "  APT repos:       https://apt.${DOMAIN}"
+log_info "  APK repos:       https://apk.${DOMAIN}"
 log_info "  Cloud images:    https://dl.${DOMAIN}"
 log_info "  Helm charts:     https://charts.${DOMAIN}"
 log_info "  Binaries:        https://bin.${DOMAIN}"
