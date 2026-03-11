@@ -1,6 +1,13 @@
 ---
 # GitLab CI for harvester-proxy-internet-vm
 # Lint + security scan + validate + ArgoCD deployment
+#
+# DISABLED: Pipeline is paused while transitioning from VM-based deployment
+# to proxy-internet-k8s-service. Remove the workflow block below to re-enable.
+
+workflow:
+  rules:
+    - when: never
 
 stages:
   - lint
