@@ -1,0 +1,142 @@
+{{- if .Values.gateway.enabled -}}
+{{- $fullname := include "proxy-internet.fullname" . -}}
+{{- $domain := .Values.domain -}}
+{{- $secretName := .Values.gateway.tls.secretName -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.certManager.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.certManager.issuer.name }}
+    {{- end }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className }}
+  addresses:
+    - type: IPAddress
+      value: {{ .Values.gateway.address | quote }}
+  listeners:
+    - name: yum
+      protocol: HTTPS
+      port: 8443
+      hostname: "yum.{{ $domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: apt
+      protocol: HTTPS
+      port: 8443
+      hostname: "apt.{{ $domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: apk
+      protocol: HTTPS
+      port: 8443
+      hostname: "apk.{{ $domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: charts
+      protocol: HTTPS
+      port: 8443
+      hostname: "charts.{{ $domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: go
+      protocol: HTTPS
+      port: 8443
+      hostname: "go.{{ $domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: npm
+      protocol: HTTPS
+      port: 8443
+      hostname: "npm.{{ $domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: pypi
+      protocol: HTTPS
+      port: 8443
+      hostname: "pypi.{{ $domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: maven
+      protocol: HTTPS
+      port: 8443
+      hostname: "maven.{{ $domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: crates
+      protocol: HTTPS
+      port: 8443
+      hostname: "crates.{{ $domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: dl
+      protocol: HTTPS
+      port: 8443
+      hostname: "dl.{{ $domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: harbor
+      protocol: HTTPS
+      port: 8443
+      hostname: "harbor.{{ $domain }}"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ $secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+{{- end }}

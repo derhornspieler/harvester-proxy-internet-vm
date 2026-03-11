@@ -1,0 +1,28 @@
+{{- if .Values.cilium.egressGateway.enabled -}}
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: cilium.io/v2
+kind: CiliumEgressGatewayPolicy
+metadata:
+  name: {{ $fullname }}-egress
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+spec:
+  selectors:
+    - podSelector:
+        matchLabels:
+          {{- include "proxy-internet.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/component: nginx
+  destinationCIDRs:
+    - "0.0.0.0/0"
+  excludedCIDRs:
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+  egressGateway:
+    nodeSelector:
+      matchLabels:
+        {{- toYaml .Values.cilium.egressGateway.nodeSelector | nindent 8 }}
+    {{- if .Values.cilium.egressGateway.egressIP }}
+    egressIP: {{ .Values.cilium.egressGateway.egressIP | quote }}
+    {{- end }}
+{{- end }}

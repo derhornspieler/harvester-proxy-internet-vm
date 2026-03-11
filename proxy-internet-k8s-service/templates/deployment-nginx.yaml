@@ -1,0 +1,214 @@
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-nginx
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx
+spec:
+  replicas: {{ .Values.nginx.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "proxy-internet.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: nginx
+  template:
+    metadata:
+      labels:
+        {{- include "proxy-internet.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: nginx
+      annotations:
+        checksum/nginx-main: {{ include (print $.Template.BasePath "/configmap-nginx-main.yaml") . | sha256sum }}
+        checksum/nginx-confd: {{ include (print $.Template.BasePath "/configmap-nginx-confd.yaml") . | sha256sum }}
+        checksum/nginx-includes: {{ include (print $.Template.BasePath "/configmap-nginx-includes.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+      containers:
+        # --- nginx ---
+        - name: nginx
+          image: {{ .Values.nginx.image }}
+          ports:
+            - name: health
+              containerPort: 8080
+              protocol: TCP
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.nginx.resources | nindent 12 }}
+          securityContext:
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            capabilities:
+              drop:
+                {{- toYaml .Values.securityContext.capabilities.drop | nindent 16 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          volumeMounts:
+            - name: nginx-main
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+            - name: nginx-confd
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+            - name: nginx-includes
+              mountPath: /etc/nginx/includes
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: cache-rpm
+              mountPath: /var/cache/nginx/rpm
+            - name: cache-charts
+              mountPath: /var/cache/nginx/charts
+            - name: cache-downloads
+              mountPath: /var/cache/nginx/downloads
+            - name: cache-go
+              mountPath: /var/cache/nginx/go
+            - name: cache-npm
+              mountPath: /var/cache/nginx/npm
+            - name: cache-pypi
+              mountPath: /var/cache/nginx/pypi
+            - name: cache-maven
+              mountPath: /var/cache/nginx/maven
+            - name: cache-crates
+              mountPath: /var/cache/nginx/crates
+            {{- if .Values.binaries.enabled }}
+            - name: binaries
+              mountPath: /srv/bin
+              readOnly: true
+            {{- end }}
+
+        # --- nginx-prometheus-exporter ---
+        - name: exporter
+          image: {{ .Values.nginx.exporterImage }}
+          args:
+            - --nginx.scrape-uri=http://127.0.0.1:8080/nginx_status
+          ports:
+            - name: metrics
+              containerPort: 9113
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.nginx.exporter.resources | nindent 12 }}
+          securityContext:
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            capabilities:
+              drop:
+                {{- toYaml .Values.securityContext.capabilities.drop | nindent 16 }}
+
+        # --- minio-sync sidecar ---
+        - name: minio-sync
+          image: {{ .Values.nginx.minioSync.image }}
+          command: ["/bin/sh", "/scripts/sync.sh"]
+          env:
+            - name: MINIO_ENDPOINT
+              value: {{ .Values.minio.endpoint | quote }}
+            - name: MINIO_BUCKET
+              value: {{ .Values.minio.bucket | quote }}
+            - name: MINIO_USE_SSL
+              value: {{ .Values.minio.useSSL | quote }}
+            {{- if .Values.minio.region }}
+            - name: MINIO_REGION
+              value: {{ .Values.minio.region | quote }}
+            {{- end }}
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "proxy-internet.minioSecretName" . }}
+                  key: access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "proxy-internet.minioSecretName" . }}
+                  key: secret-key
+            - name: SYNC_INTERVAL
+              value: "300"
+          resources:
+            {{- toYaml .Values.nginx.minioSync.resources | nindent 12 }}
+          securityContext:
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            capabilities:
+              drop:
+                {{- toYaml .Values.securityContext.capabilities.drop | nindent 16 }}
+          volumeMounts:
+            - name: minio-sync-script
+              mountPath: /scripts
+              readOnly: true
+            - name: cache-rpm
+              mountPath: /var/cache/nginx/rpm
+            - name: cache-charts
+              mountPath: /var/cache/nginx/charts
+            - name: cache-downloads
+              mountPath: /var/cache/nginx/downloads
+            - name: cache-go
+              mountPath: /var/cache/nginx/go
+            - name: cache-npm
+              mountPath: /var/cache/nginx/npm
+            - name: cache-pypi
+              mountPath: /var/cache/nginx/pypi
+            - name: cache-maven
+              mountPath: /var/cache/nginx/maven
+            - name: cache-crates
+              mountPath: /var/cache/nginx/crates
+
+      volumes:
+        - name: nginx-main
+          configMap:
+            name: {{ $fullname }}-nginx-main
+        - name: nginx-confd
+          configMap:
+            name: {{ $fullname }}-nginx-confd
+        - name: nginx-includes
+          configMap:
+            name: {{ $fullname }}-nginx-includes
+        - name: minio-sync-script
+          configMap:
+            name: {{ $fullname }}-minio-sync
+            defaultMode: 0555
+        - name: tmp
+          emptyDir: {}
+        - name: cache-rpm
+          emptyDir:
+            sizeLimit: {{ .Values.nginx.cache.rpm }}
+        - name: cache-charts
+          emptyDir:
+            sizeLimit: {{ .Values.nginx.cache.charts }}
+        - name: cache-downloads
+          emptyDir:
+            sizeLimit: {{ .Values.nginx.cache.downloads }}
+        - name: cache-go
+          emptyDir:
+            sizeLimit: {{ .Values.nginx.cache.go }}
+        - name: cache-npm
+          emptyDir:
+            sizeLimit: {{ .Values.nginx.cache.npm }}
+        - name: cache-pypi
+          emptyDir:
+            sizeLimit: {{ .Values.nginx.cache.pypi }}
+        - name: cache-maven
+          emptyDir:
+            sizeLimit: {{ .Values.nginx.cache.maven }}
+        - name: cache-crates
+          emptyDir:
+            sizeLimit: {{ .Values.nginx.cache.crates }}
+        {{- if .Values.binaries.enabled }}
+        - name: binaries
+          persistentVolumeClaim:
+            claimName: {{ .Values.binaries.existingClaim | default (printf "%s-binaries" $fullname) }}
+        {{- end }}

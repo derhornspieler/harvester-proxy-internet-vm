@@ -1,0 +1,24 @@
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: RedisSentinel
+metadata:
+  name: {{ $fullname }}-sentinel
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis-sentinel
+spec:
+  clusterSize: {{ .Values.redis.sentinel.replicas }}
+  kubernetesConfig:
+    image: {{ .Values.redis.image }}
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  redisSentinelConfig:
+    redisReplicationName: {{ $fullname }}-redis
+    masterGroupName: {{ $fullname }}
+    quorum: {{ div (add .Values.redis.sentinel.replicas 1) 2 | quote }}
+  securityContext:
+    runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+    runAsUser: 999
+    runAsGroup: 999

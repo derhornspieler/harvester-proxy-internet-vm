@@ -1,0 +1,10 @@
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-charts-manifest
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+data:
+  manifest.txt: |
+    {{- include "proxy-internet.chartsManifest" . | nindent 4 }}

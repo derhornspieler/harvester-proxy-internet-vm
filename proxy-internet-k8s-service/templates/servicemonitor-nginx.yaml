@@ -1,0 +1,18 @@
+{{- if .Values.monitoring.serviceMonitor.enabled -}}
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $fullname }}-nginx
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "proxy-internet.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: nginx
+  endpoints:
+    - port: metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+{{- end }}

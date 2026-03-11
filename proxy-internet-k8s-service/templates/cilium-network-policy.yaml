@@ -1,0 +1,145 @@
+{{- if .Values.cilium.networkPolicy.enabled -}}
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ $fullname }}-nginx
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+spec:
+  endpointSelector:
+    matchLabels:
+      {{- include "proxy-internet.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: nginx
+  ingress:
+    # Allow traffic from Traefik (Gateway API)
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: traefik
+      toPorts:
+        - ports:
+            - port: "8081"
+              protocol: TCP
+    # Allow health checks from kubelet
+    - fromEntities:
+        - host
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+    # Allow Prometheus scraping
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: prometheus
+      toPorts:
+        - ports:
+            - port: "9113"
+              protocol: TCP
+  egress:
+    # Allow DNS
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    # Allow outbound to internet (upstream repos)
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "80"
+              protocol: TCP
+    # Allow to MinIO
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: minio
+      toPorts:
+        - ports:
+            - port: "9000"
+              protocol: TCP
+    # Allow to Redis
+    - toEndpoints:
+        - matchLabels:
+            app: {{ $fullname }}-redis
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+    # Allow to helm-sync Service
+    - toEndpoints:
+        - matchLabels:
+            {{- include "proxy-internet.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: helm-sync
+      toPorts:
+        - ports:
+            - port: "8888"
+              protocol: TCP
+    # Allow to Harbor (for harbor.conf proxy_pass)
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: harbor
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ $fullname }}-helm-sync
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+spec:
+  endpointSelector:
+    matchLabels:
+      {{- include "proxy-internet.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: helm-sync
+  ingress:
+    # Allow from nginx (mirror-sync requests)
+    - fromEndpoints:
+        - matchLabels:
+            {{- include "proxy-internet.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: nginx
+      toPorts:
+        - ports:
+            - port: "8888"
+              protocol: TCP
+  egress:
+    # Allow DNS
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    # Allow to Harbor (push charts)
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: harbor
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "443"
+              protocol: TCP
+    # Allow outbound to internet (download charts)
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "80"
+              protocol: TCP
+{{- end }}

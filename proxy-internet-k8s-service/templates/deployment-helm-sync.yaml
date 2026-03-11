@@ -1,0 +1,81 @@
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-helm-sync
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: helm-sync
+spec:
+  replicas: {{ .Values.helmSync.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "proxy-internet.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: helm-sync
+  template:
+    metadata:
+      labels:
+        {{- include "proxy-internet.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: helm-sync
+      annotations:
+        checksum/manifest: {{ include (print $.Template.BasePath "/configmap-charts-manifest.yaml") . | sha256sum }}
+    spec:
+      securityContext:
+        runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: helm-sync
+          image: "{{ .Values.helmSync.image.repository }}:{{ .Values.helmSync.image.tag }}"
+          imagePullPolicy: {{ .Values.helmSync.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8888
+              protocol: TCP
+          env:
+            - name: HARBOR_HOST
+              value: {{ .Values.harbor.host | quote }}
+            - name: HARBOR_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "proxy-internet.harborSecretName" . }}
+                  key: username
+            - name: HARBOR_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "proxy-internet.harborSecretName" . }}
+                  key: password
+            - name: MANIFEST_FILE
+              value: /config/manifest.txt
+          resources:
+            {{- toYaml .Values.helmSync.resources | nindent 12 }}
+          securityContext:
+            readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
+            allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+            capabilities:
+              drop:
+                {{- toYaml .Values.securityContext.capabilities.drop | nindent 16 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: manifest
+              mountPath: /config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: manifest
+          configMap:
+            name: {{ $fullname }}-charts-manifest
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,230 @@
+# Base domain for all proxy hostnames
+domain: aegisgroup.ch
+
+# --- Harbor ---
+harbor:
+  host: harbor.aegisgroup.ch
+  existingSecret: ""
+  user: "robot$helm-sync"
+  pass: "changeme"
+
+# --- MinIO (existing) ---
+minio:
+  endpoint: "minio.minio.svc:9000"
+  bucket: "proxy-cache"
+  region: ""
+  existingSecret: ""
+  accessKey: ""
+  secretKey: ""
+  useSSL: false
+
+# --- Redis HA ---
+redis:
+  replicas: 3
+  sentinel:
+    replicas: 3
+  image: redis:7-alpine
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# --- Nginx Proxy ---
+nginx:
+  replicaCount: 2
+  image: nginx:1.27-alpine
+  exporterImage: nginx/nginx-prometheus-exporter:1.4
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  exporter:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+  minioSync:
+    image: alpine:3.21
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+  cache:
+    rpm: 5Gi
+    charts: 1Gi
+    downloads: 10Gi
+    go: 2Gi
+    npm: 3Gi
+    pypi: 3Gi
+    maven: 3Gi
+    crates: 2Gi
+
+# --- Static binaries ---
+binaries:
+  enabled: false
+  existingClaim: ""
+
+# --- HPA ---
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    customMetricsEnabled: false
+    cpu:
+      targetAverageUtilization: 70
+    memory:
+      targetAverageUtilization: 80
+    networkRxBytesPerSec:
+      targetValue: "100M"
+    requestsPerSec:
+      targetValue: "1000"
+    cacheMissRate:
+      targetValue: "60"
+  scaleUp:
+    stabilizationWindowSeconds: 60
+    podCount: 1
+    periodSeconds: 60
+  scaleDown:
+    stabilizationWindowSeconds: 300
+    podCount: 1
+    periodSeconds: 60
+
+# --- PDB ---
+pdb:
+  nginx:
+    minAvailable: 1
+  redis:
+    minAvailable: 2
+
+# --- helm-sync ---
+helmSync:
+  replicaCount: 1
+  image:
+    repository: ""
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# --- Gateway API ---
+gateway:
+  enabled: true
+  className: traefik
+  address: "192.168.48.4"
+  tls:
+    secretName: proxy-internet-tls
+
+# --- cert-manager + Vault PKI ---
+certManager:
+  enabled: true
+  issuer:
+    name: vault-pki-issuer
+    kind: ClusterIssuer
+  vaultPKI:
+    server: "https://vault.vault.svc:8200"
+    path: "pki/sign/proxy-internet"
+    authPath: "kubernetes"
+    role: "proxy-internet"
+    serviceAccountRef: "cert-manager"
+  duration: 720h
+  renewBefore: 240h
+
+# --- Cilium ---
+cilium:
+  egressGateway:
+    enabled: true
+    egressIP: ""
+    nodeSelector:
+      kubernetes.io/os: linux
+  networkPolicy:
+    enabled: true
+
+# --- Observability ---
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+  prometheusRule:
+    enabled: true
+
+# --- Security context ---
+securityContext:
+  runAsNonRoot: true
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+# --- Helm charts manifest ---
+charts:
+  - source: https://charts.jetstack.io
+    version: v1.19.3
+    harborProject: charts.jetstack.io
+    name: cert-manager
+    envVar: HELM_OCI_CERT_MANAGER
+    locationPath: /jetstack/
+  - source: https://cloudnative-pg.github.io/charts
+    version: "0.27.1"
+    harborProject: cloudnative-pg.github.io
+    name: cloudnative-pg
+    envVar: HELM_OCI_CNPG
+    locationPath: /cnpg/
+  - source: https://helm.releases.hashicorp.com
+    version: "0.32.0"
+    harborProject: helm.releases.hashicorp.com
+    name: vault
+    envVar: HELM_OCI_VAULT
+    locationPath: /hashicorp/
+  - source: https://helm.goharbor.io
+    version: "1.18.2"
+    harborProject: helm.goharbor.io
+    name: harbor
+    envVar: HELM_OCI_HARBOR
+    locationPath: /goharbor/
+  - source: https://prometheus-community.github.io/helm-charts
+    version: "72.6.2"
+    harborProject: prometheus-community.github.io
+    name: kube-prometheus-stack
+    envVar: HELM_OCI_KPS
+    locationPath: /prometheus-community/
+  - source: https://external-secrets.io
+    version: latest
+    harborProject: charts.external-secrets.io
+    name: external-secrets
+    envVar: HELM_OCI_EXTERNAL_SECRETS
+    locationPath: /external-secrets/
+  - source: https://kubernetes.github.io/autoscaler
+    version: latest
+    harborProject: kubernetes.github.io
+    name: cluster-autoscaler
+    envVar: HELM_OCI_CLUSTER_AUTOSCALER
+    locationPath: /autoscaler/
+  - source: https://ot-container-kit.github.io/helm-charts/
+    version: latest
+    harborProject: ot-container-kit.github.io
+    name: redis-operator
+    envVar: HELM_OCI_REDIS_OPERATOR
+    locationPath: /ot-helm/
+  - source: https://helm.kasmweb.com/
+    version: "1.1181.0"
+    harborProject: helm.kasmweb.com
+    name: kasm
+    envVar: HELM_OCI_KASM
+    locationPath: /kasmtech/
+  - source: https://charts.gitlab.io
+    version: latest
+    harborProject: charts.gitlab.io
+    name: gitlab-runner
+    envVar: HELM_OCI_GITLAB_RUNNER
+    locationPath: /gitlab/
+  - source: https://mariadb-operator.github.io/mariadb-operator
+    version: latest
+    harborProject: mariadb-operator.github.io
+    name: mariadb-operator
+    envVar: HELM_OCI_MARIADB_OPERATOR
+    locationPath: /mariadb-operator/

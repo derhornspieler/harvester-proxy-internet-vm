@@ -1,0 +1,69 @@
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-minio-sync
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+data:
+  sync.sh: |
+    #!/bin/sh
+    set -eu
+
+    # MinIO sync sidecar — periodically uploads nginx cache to MinIO (L2 cache)
+    # and restores cache from MinIO on startup.
+    #
+    # Environment:
+    #   MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY
+    #   MINIO_USE_SSL (true/false), MINIO_REGION (optional)
+    #   CACHE_DIRS — colon-separated list of cache directories to sync
+    #   SYNC_INTERVAL — seconds between sync runs (default: 300)
+
+    SYNC_INTERVAL="${SYNC_INTERVAL:-300}"
+    CACHE_DIRS="${CACHE_DIRS:-/var/cache/nginx/rpm:/var/cache/nginx/charts:/var/cache/nginx/downloads:/var/cache/nginx/go:/var/cache/nginx/npm:/var/cache/nginx/pypi:/var/cache/nginx/maven:/var/cache/nginx/crates}"
+
+    SCHEME="http"
+    if [ "${MINIO_USE_SSL:-false}" = "true" ]; then
+      SCHEME="https"
+    fi
+
+    # Configure mc (MinIO client)
+    mc_bin="/usr/bin/mc"
+    if ! command -v mc >/dev/null 2>&1; then
+      echo "Installing MinIO client..."
+      wget -q "https://dl.min.io/client/mc/release/linux-amd64/mc" -O /tmp/mc
+      chmod +x /tmp/mc
+      mc_bin="/tmp/mc"
+    fi
+
+    "${mc_bin}" alias set minio "${SCHEME}://${MINIO_ENDPOINT}" \
+      "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}" --api S3v4
+
+    # Ensure bucket exists
+    "${mc_bin}" mb --ignore-existing "minio/${MINIO_BUCKET}"
+
+    # Initial restore from MinIO
+    echo "Restoring cache from MinIO..."
+    IFS=':'
+    for dir in ${CACHE_DIRS}; do
+      dirname=$(basename "${dir}")
+      if "${mc_bin}" ls "minio/${MINIO_BUCKET}/${dirname}/" >/dev/null 2>&1; then
+        mkdir -p "${dir}"
+        "${mc_bin}" mirror --overwrite "minio/${MINIO_BUCKET}/${dirname}/" "${dir}/" || true
+        echo "Restored ${dirname}"
+      fi
+    done
+    unset IFS
+
+    echo "Starting periodic sync (every ${SYNC_INTERVAL}s)..."
+    while true; do
+      sleep "${SYNC_INTERVAL}"
+      IFS=':'
+      for dir in ${CACHE_DIRS}; do
+        dirname=$(basename "${dir}")
+        if [ -d "${dir}" ]; then
+          "${mc_bin}" mirror --overwrite "${dir}/" "minio/${MINIO_BUCKET}/${dirname}/" || true
+        fi
+      done
+      unset IFS
+    done

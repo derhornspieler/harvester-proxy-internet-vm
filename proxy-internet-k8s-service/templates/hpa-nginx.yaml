@@ -1,0 +1,65 @@
+{{- if .Values.hpa.enabled -}}
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $fullname }}-nginx
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $fullname }}-nginx
+  minReplicas: {{ .Values.hpa.minReplicas }}
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.metrics.cpu.targetAverageUtilization }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.metrics.memory.targetAverageUtilization }}
+    {{- if .Values.hpa.metrics.customMetricsEnabled }}
+    - type: Pods
+      pods:
+        metric:
+          name: nginx_network_rx_bytes_per_sec
+        target:
+          type: AverageValue
+          averageValue: {{ .Values.hpa.metrics.networkRxBytesPerSec.targetValue | quote }}
+    - type: Pods
+      pods:
+        metric:
+          name: nginx_http_requests_per_sec
+        target:
+          type: AverageValue
+          averageValue: {{ .Values.hpa.metrics.requestsPerSec.targetValue | quote }}
+    - type: Pods
+      pods:
+        metric:
+          name: nginx_cache_miss_rate
+        target:
+          type: AverageValue
+          averageValue: {{ .Values.hpa.metrics.cacheMissRate.targetValue | quote }}
+    {{- end }}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.hpa.scaleUp.stabilizationWindowSeconds }}
+      policies:
+        - type: Pods
+          value: {{ .Values.hpa.scaleUp.podCount }}
+          periodSeconds: {{ .Values.hpa.scaleUp.periodSeconds }}
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.hpa.scaleDown.stabilizationWindowSeconds }}
+      policies:
+        - type: Pods
+          value: {{ .Values.hpa.scaleDown.podCount }}
+          periodSeconds: {{ .Values.hpa.scaleDown.periodSeconds }}
+{{- end }}

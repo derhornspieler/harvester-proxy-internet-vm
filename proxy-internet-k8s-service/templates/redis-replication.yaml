@@ -1,0 +1,29 @@
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: redis.redis.opstreelabs.in/v1beta2
+kind: RedisReplication
+metadata:
+  name: {{ $fullname }}-redis
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  clusterSize: {{ .Values.redis.replicas }}
+  kubernetesConfig:
+    image: {{ .Values.redis.image }}
+    resources:
+      {{- toYaml .Values.redis.resources | nindent 6 }}
+  redisExporter:
+    enabled: true
+    image: oliver006/redis_exporter:v1.66.0-alpine
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+  securityContext:
+    runAsNonRoot: {{ .Values.securityContext.runAsNonRoot }}
+    runAsUser: 999
+    runAsGroup: 999

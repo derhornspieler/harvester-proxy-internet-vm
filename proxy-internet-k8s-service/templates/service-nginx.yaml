@@ -1,0 +1,26 @@
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-nginx
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+      protocol: TCP
+    - name: health
+      port: 8080
+      targetPort: health
+      protocol: TCP
+    - name: metrics
+      port: 9113
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    {{- include "proxy-internet.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx

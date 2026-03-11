@@ -1,0 +1,13 @@
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}-redis
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.pdb.redis.minAvailable }}
+  selector:
+    matchLabels:
+      app: {{ $fullname }}-redis
+      redis_setup_type: replication

@@ -1,0 +1,17 @@
+apiVersion: v2
+name: proxy-internet-k8s-service
+description: >-
+  Kubernetes-native internet proxy with nginx caching reverse proxy,
+  Redis HA shared cache index, MinIO durable cache, and HPA scaling
+version: 0.1.0
+appVersion: "1.0.0"
+type: application
+keywords:
+  - proxy
+  - cache
+  - airgap
+  - nginx
+  - helm
+  - harbor
+maintainers:
+  - name: derhornspieler

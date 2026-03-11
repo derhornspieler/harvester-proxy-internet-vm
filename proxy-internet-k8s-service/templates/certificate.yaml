@@ -1,0 +1,31 @@
+{{- if .Values.certManager.enabled -}}
+{{- $fullname := include "proxy-internet.fullname" . -}}
+{{- $domain := .Values.domain -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+spec:
+  secretName: {{ .Values.gateway.tls.secretName }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  issuerRef:
+    name: {{ .Values.certManager.issuer.name }}
+    kind: {{ .Values.certManager.issuer.kind }}
+  commonName: "proxy-internet.{{ $domain }}"
+  dnsNames:
+    - "yum.{{ $domain }}"
+    - "apt.{{ $domain }}"
+    - "apk.{{ $domain }}"
+    - "charts.{{ $domain }}"
+    - "go.{{ $domain }}"
+    - "npm.{{ $domain }}"
+    - "pypi.{{ $domain }}"
+    - "maven.{{ $domain }}"
+    - "crates.{{ $domain }}"
+    - "dl.{{ $domain }}"
+    - "harbor.{{ $domain }}"
+    - "proxy.{{ $domain }}"
+{{- end }}

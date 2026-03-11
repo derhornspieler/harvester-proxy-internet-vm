@@ -1,0 +1,13 @@
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}-nginx
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.pdb.nginx.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "proxy-internet.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: nginx

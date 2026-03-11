@@ -1,0 +1,69 @@
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-nginx-includes
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+data:
+  proxy-defaults.conf: |
+    proxy_set_header Host $proxy_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    proxy_ssl_server_name on;
+    proxy_ssl_protocols TLSv1.2 TLSv1.3;
+
+    proxy_connect_timeout 30s;
+    proxy_send_timeout 300s;
+    proxy_read_timeout 300s;
+
+    proxy_buffering on;
+    proxy_buffer_size 16k;
+    proxy_buffers 8 32k;
+    proxy_busy_buffers_size 64k;
+
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+
+  cache.conf: |
+    # RPM/APT/APK packages
+    proxy_cache_path /var/cache/nginx/rpm
+      levels=1:2 keys_zone=rpm_cache:50m
+      max_size=20g inactive=30d use_temp_path=off;
+
+    # Helm chart repos
+    proxy_cache_path /var/cache/nginx/charts
+      levels=1:2 keys_zone=charts_cache:10m
+      max_size=2g inactive=1d use_temp_path=off;
+
+    # Large downloads (qcow2, ISOs)
+    proxy_cache_path /var/cache/nginx/downloads
+      levels=1:2 keys_zone=downloads_cache:20m
+      max_size=30g inactive=30d use_temp_path=off;
+
+    # Go modules
+    proxy_cache_path /var/cache/nginx/go
+      levels=1:2 keys_zone=go_cache:20m
+      max_size=5g inactive=30d use_temp_path=off;
+
+    # npm packages
+    proxy_cache_path /var/cache/nginx/npm
+      levels=1:2 keys_zone=npm_cache:20m
+      max_size=10g inactive=30d use_temp_path=off;
+
+    # PyPI packages
+    proxy_cache_path /var/cache/nginx/pypi
+      levels=1:2 keys_zone=pypi_cache:20m
+      max_size=10g inactive=30d use_temp_path=off;
+
+    # Maven artifacts
+    proxy_cache_path /var/cache/nginx/maven
+      levels=1:2 keys_zone=maven_cache:20m
+      max_size=10g inactive=30d use_temp_path=off;
+
+    # Rust crates
+    proxy_cache_path /var/cache/nginx/crates
+      levels=1:2 keys_zone=crates_cache:10m
+      max_size=5g inactive=30d use_temp_path=off;

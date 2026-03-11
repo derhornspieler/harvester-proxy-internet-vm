@@ -1,0 +1,70 @@
+{{- if .Values.monitoring.prometheusRule.enabled -}}
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+spec:
+  groups:
+    - name: {{ $fullname }}.rules
+      rules:
+        - alert: ProxyInternetNginxDown
+          expr: |
+            up{job="{{ $fullname }}-nginx"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Proxy internet nginx is down"
+            description: "{{ `{{ $labels.pod }}` }} has been down for more than 2 minutes."
+
+        - alert: ProxyInternetHighCacheMissRate
+          expr: |
+            (
+              rate(nginx_http_requests_total{job="{{ $fullname }}-nginx",status=~"2.."}[5m])
+              - rate(nginx_http_requests_total{job="{{ $fullname }}-nginx",upstream_cache_status="HIT"}[5m])
+            )
+            / rate(nginx_http_requests_total{job="{{ $fullname }}-nginx",status=~"2.."}[5m])
+            > 0.8
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High cache miss rate on proxy-internet"
+            description: "Cache miss rate is above 80% for 15 minutes."
+
+        - alert: ProxyInternetRedisDown
+          expr: |
+            up{job="{{ $fullname }}-redis"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Proxy internet Redis is down"
+            description: "{{ `{{ $labels.pod }}` }} Redis instance has been down for more than 2 minutes."
+
+        - alert: ProxyInternetHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              rate(nginx_http_request_duration_seconds_bucket{job="{{ $fullname }}-nginx"}[5m])
+            ) > 5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High request latency on proxy-internet"
+            description: "95th percentile latency is above 5 seconds for 10 minutes."
+
+        - alert: ProxyInternetHPAMaxedOut
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler="{{ $fullname }}-nginx"}
+            == kube_horizontalpodautoscaler_spec_max_replicas{horizontalpodautoscaler="{{ $fullname }}-nginx"}
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Proxy internet HPA at maximum replicas"
+            description: "HPA has been at max replicas for 30 minutes — consider increasing maxReplicas."
+{{- end }}

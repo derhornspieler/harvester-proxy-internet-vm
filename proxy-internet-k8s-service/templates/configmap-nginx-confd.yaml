@@ -1,0 +1,546 @@
+{{- $fullname := include "proxy-internet.fullname" . -}}
+{{- $domain := .Values.domain -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-nginx-confd
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+data:
+  yum.conf: |
+    # yum.{{ $domain }} — RPM repository proxy (Rocky 9, EPEL, RKE2)
+    server {
+        listen 8081;
+        server_name yum.{{ $domain }};
+
+        location /rocky/9/ {
+            proxy_pass https://dl.rockylinux.org/pub/rocky/9/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /epel/9/ {
+            proxy_pass https://dl.fedoraproject.org/pub/epel/9/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location = /epel/RPM-GPG-KEY-EPEL-9 {
+            proxy_pass https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 30d;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /rke2/latest/common/ {
+            proxy_pass https://rpm.rancher.io/rke2/latest/common/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /rke2/latest/1.34/ {
+            proxy_pass https://rpm.rancher.io/rke2/latest/1.34/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location = /rke2/public.key {
+            proxy_pass https://rpm.rancher.io/public.key;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 30d;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+    }
+
+  apt.conf: |
+    # apt.{{ $domain }} — Debian/Ubuntu APT repository proxy
+    server {
+        listen 8081;
+        server_name apt.{{ $domain }};
+
+        location /debian/ {
+            proxy_pass https://deb.debian.org/debian/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /debian-security/ {
+            proxy_pass https://security.debian.org/debian-security/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /ubuntu/ {
+            proxy_pass https://archive.ubuntu.com/ubuntu/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /ubuntu-security/ {
+            proxy_pass https://security.ubuntu.com/ubuntu/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+    }
+
+  apk.conf: |
+    # apk.{{ $domain }} — Alpine Linux APK repository proxy
+    server {
+        listen 8081;
+        server_name apk.{{ $domain }};
+
+        location /alpine/v3.21/ {
+            proxy_pass https://dl-cdn.alpinelinux.org/alpine/v3.21/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /alpine/v3.20/ {
+            proxy_pass https://dl-cdn.alpinelinux.org/alpine/v3.20/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /alpine/edge/ {
+            proxy_pass https://dl-cdn.alpinelinux.org/alpine/edge/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /alpine/keys/ {
+            proxy_pass https://dl-cdn.alpinelinux.org/alpine/keys/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache rpm_cache;
+            proxy_cache_valid 200 30d;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+    }
+
+  charts.conf: |
+    # charts.{{ $domain }} — Helm HTTP repository proxy (11 upstreams)
+    server {
+        listen 8081;
+        server_name charts.{{ $domain }};
+
+        # Internal mirror endpoint — fire-and-forget to helm-sync Service
+        set $helm_sync_upstream http://{{ $fullname }}-helm-sync:8888;
+        location = /mirror-sync {
+            internal;
+            proxy_pass $helm_sync_upstream/sync;
+            proxy_set_header X-Original-URI $request_uri;
+            proxy_connect_timeout 1s;
+            proxy_read_timeout 1s;
+            proxy_send_timeout 1s;
+        }
+
+        # cert-manager
+        location /jetstack/ {
+            mirror /mirror-sync;
+            mirror_request_body off;
+            proxy_pass https://charts.jetstack.io/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache charts_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        # cloudnative-pg
+        location /cnpg/ {
+            mirror /mirror-sync;
+            mirror_request_body off;
+            proxy_pass https://cloudnative-pg.github.io/charts/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache charts_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        # vault
+        location /hashicorp/ {
+            mirror /mirror-sync;
+            mirror_request_body off;
+            proxy_pass https://helm.releases.hashicorp.com/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache charts_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        # harbor
+        location /goharbor/ {
+            mirror /mirror-sync;
+            mirror_request_body off;
+            proxy_pass https://helm.goharbor.io/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache charts_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        # kube-prometheus-stack
+        location /prometheus-community/ {
+            mirror /mirror-sync;
+            mirror_request_body off;
+            proxy_pass https://prometheus-community.github.io/helm-charts/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache charts_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        # external-secrets
+        location /external-secrets/ {
+            mirror /mirror-sync;
+            mirror_request_body off;
+            proxy_pass https://external-secrets.io/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache charts_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        # cluster-autoscaler
+        location /autoscaler/ {
+            mirror /mirror-sync;
+            mirror_request_body off;
+            proxy_pass https://kubernetes.github.io/autoscaler/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache charts_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        # redis-operator
+        location /ot-helm/ {
+            mirror /mirror-sync;
+            mirror_request_body off;
+            proxy_pass https://ot-container-kit.github.io/helm-charts/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache charts_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        # kasm
+        location /kasmtech/ {
+            mirror /mirror-sync;
+            mirror_request_body off;
+            proxy_pass https://helm.kasmweb.com/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache charts_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        # gitlab-runner
+        location /gitlab/ {
+            mirror /mirror-sync;
+            mirror_request_body off;
+            proxy_pass https://charts.gitlab.io/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache charts_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        # mariadb-operator
+        location /mariadb-operator/ {
+            mirror /mirror-sync;
+            mirror_request_body off;
+            proxy_pass https://mariadb-operator.github.io/mariadb-operator/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache charts_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+    }
+
+  go.conf: |
+    # go.{{ $domain }} — Go module proxy cache
+    server {
+        listen 8081;
+        server_name go.{{ $domain }};
+
+        location / {
+            proxy_pass https://proxy.golang.org;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache go_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+            proxy_max_temp_file_size 512m;
+        }
+
+        location /sumdb/ {
+            proxy_pass https://sum.golang.org/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache go_cache;
+            proxy_cache_valid 200 30d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+    }
+
+  npm.conf: |
+    # npm.{{ $domain }} — npm registry proxy cache
+    server {
+        listen 8081;
+        server_name npm.{{ $domain }};
+
+        location / {
+            proxy_pass https://registry.npmjs.org;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache npm_cache;
+            proxy_cache_valid 200 7d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+            proxy_max_temp_file_size 512m;
+        }
+    }
+
+  pypi.conf: |
+    # pypi.{{ $domain }} — PyPI package proxy cache
+    server {
+        listen 8081;
+        server_name pypi.{{ $domain }};
+
+        location /simple/ {
+            proxy_pass https://pypi.org/simple/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache pypi_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /pypi/ {
+            proxy_pass https://pypi.org/pypi/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache pypi_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /packages/ {
+            proxy_pass https://files.pythonhosted.org/packages/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache pypi_cache;
+            proxy_cache_valid 200 30d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+            proxy_max_temp_file_size 512m;
+        }
+    }
+
+  maven.conf: |
+    # maven.{{ $domain }} — Maven Central repository proxy cache
+    server {
+        listen 8081;
+        server_name maven.{{ $domain }};
+
+        location /maven2/ {
+            proxy_pass https://repo1.maven.org/maven2/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache maven_cache;
+            proxy_cache_valid 200 30d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+            proxy_max_temp_file_size 512m;
+        }
+
+        location /google/ {
+            proxy_pass https://maven.google.com/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache maven_cache;
+            proxy_cache_valid 200 30d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /gradle-plugins/ {
+            proxy_pass https://plugins.gradle.org/m2/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache maven_cache;
+            proxy_cache_valid 200 30d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+    }
+
+  crates.conf: |
+    # crates.{{ $domain }} — Rust crates.io proxy cache
+    server {
+        listen 8081;
+        server_name crates.{{ $domain }};
+
+        location /api/v1/crates/ {
+            proxy_pass https://index.crates.io/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache crates_cache;
+            proxy_cache_valid 200 1d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
+
+        location /api/v1/crates/download/ {
+            proxy_pass https://static.crates.io/crates/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache crates_cache;
+            proxy_cache_valid 200 30d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+            proxy_max_temp_file_size 256m;
+        }
+    }
+
+  dl.conf: |
+    # dl.{{ $domain }} — Cloud images and ISO proxy
+    server {
+        listen 8081;
+        server_name dl.{{ $domain }};
+
+        location /rocky/9/ {
+            proxy_pass https://dl.rockylinux.org/pub/rocky/9/;
+            include /etc/nginx/includes/proxy-defaults.conf;
+            proxy_cache downloads_cache;
+            proxy_cache_valid 200 30d;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating;
+            add_header X-Cache-Status $upstream_cache_status;
+            proxy_max_temp_file_size 4096m;
+        }
+    }
+
+  harbor.conf: |
+    # harbor.{{ $domain }} — Reverse proxy to Harbor service
+    server {
+        listen 8081;
+        server_name harbor.{{ $domain }};
+
+        client_max_body_size 0;
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_read_timeout 900s;
+        proxy_send_timeout 900s;
+
+        set $harbor_upstream http://harbor-core.harbor.svc.cluster.local:80;
+
+        location / {
+            proxy_pass $harbor_upstream;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header Connection "";
+            chunked_transfer_encoding on;
+        }
+
+        location /v2/ {
+            proxy_pass $harbor_upstream;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header Connection "";
+            chunked_transfer_encoding on;
+            proxy_read_timeout 900s;
+            proxy_send_timeout 900s;
+        }
+    }
+
+  {{- if .Values.binaries.enabled }}
+  bin.conf: |
+    # bin.{{ $domain }} — Static binary file server
+    server {
+        listen 8081;
+        server_name bin.{{ $domain }};
+
+        root /srv/bin;
+        autoindex off;
+
+        location / {
+            try_files $uri =404;
+            add_header Cache-Control "public, max-age=86400, immutable";
+        }
+    }
+  {{- end }}

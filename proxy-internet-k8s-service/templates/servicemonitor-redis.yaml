@@ -1,0 +1,18 @@
+{{- if .Values.monitoring.serviceMonitor.enabled -}}
+{{- $fullname := include "proxy-internet.fullname" . -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $fullname }}-redis
+  labels:
+    {{- include "proxy-internet.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $fullname }}-redis
+      redis_setup_type: replication
+  endpoints:
+    - port: redis-exporter
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+{{- end }}
