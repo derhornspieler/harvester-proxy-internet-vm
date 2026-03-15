@@ -121,14 +121,8 @@ gateway:
 certManager:
   enabled: true
   issuer:
-    name: vault-pki-issuer
+    name: vault-issuer
     kind: ClusterIssuer
-  vaultPKI:
-    server: "https://vault.vault.svc:8200"
-    path: "pki/sign/proxy-internet"
-    authPath: "kubernetes"
-    role: "proxy-internet"
-    serviceAccountRef: "cert-manager"
   duration: 720h
   renewBefore: 240h
 
