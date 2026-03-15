@@ -7,13 +7,20 @@ metadata:
     {{- include "proxy-internet.labels" . | nindent 4 }}
 data:
   proxy-defaults.conf: |
+    {{- if .Values.upstreamProxy.enabled }}
+    proxy_set_header Host $host;
+    {{- else }}
     proxy_set_header Host $proxy_host;
+    {{- end }}
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 
     proxy_ssl_server_name on;
     proxy_ssl_protocols TLSv1.2 TLSv1.3;
+    {{- if .Values.upstreamProxy.enabled }}
+    proxy_ssl_verify off;
+    {{- end }}
 
     proxy_connect_timeout 30s;
     proxy_send_timeout 300s;

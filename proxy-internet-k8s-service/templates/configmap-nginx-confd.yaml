@@ -1,5 +1,7 @@
 {{- $fullname := include "proxy-internet.fullname" . -}}
 {{- $domain := .Values.domain -}}
+{{- $proxyEnabled := .Values.upstreamProxy.enabled -}}
+{{- $proxyIP := .Values.upstreamProxy.ip -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,7 +16,11 @@ data:
         server_name yum.{{ $domain }};
 
         location /rocky/9/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://dl.rockylinux.org/pub/rocky/9/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 7d;
@@ -24,7 +30,11 @@ data:
         }
 
         location /epel/9/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://dl.fedoraproject.org/pub/epel/9/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 7d;
@@ -34,7 +44,11 @@ data:
         }
 
         location = /epel/RPM-GPG-KEY-EPEL-9 {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-9;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 30d;
@@ -42,7 +56,11 @@ data:
         }
 
         location /rke2/latest/common/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://rpm.rancher.io/rke2/latest/common/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 7d;
@@ -52,7 +70,11 @@ data:
         }
 
         location /rke2/latest/1.34/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://rpm.rancher.io/rke2/latest/1.34/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 7d;
@@ -62,7 +84,11 @@ data:
         }
 
         location = /rke2/public.key {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://rpm.rancher.io/public.key;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 30d;
@@ -77,7 +103,11 @@ data:
         server_name apt.{{ $domain }};
 
         location /debian/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://deb.debian.org/debian/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 7d;
@@ -87,7 +117,11 @@ data:
         }
 
         location /debian-security/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://security.debian.org/debian-security/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 7d;
@@ -97,7 +131,11 @@ data:
         }
 
         location /ubuntu/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://archive.ubuntu.com/ubuntu/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 7d;
@@ -107,7 +145,11 @@ data:
         }
 
         location /ubuntu-security/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://security.ubuntu.com/ubuntu/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 7d;
@@ -124,7 +166,11 @@ data:
         server_name apk.{{ $domain }};
 
         location /alpine/v3.21/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://dl-cdn.alpinelinux.org/alpine/v3.21/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 7d;
@@ -134,7 +180,11 @@ data:
         }
 
         location /alpine/v3.20/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://dl-cdn.alpinelinux.org/alpine/v3.20/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 7d;
@@ -144,7 +194,11 @@ data:
         }
 
         location /alpine/edge/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://dl-cdn.alpinelinux.org/alpine/edge/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 7d;
@@ -154,7 +208,11 @@ data:
         }
 
         location /alpine/keys/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://dl-cdn.alpinelinux.org/alpine/keys/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache rpm_cache;
             proxy_cache_valid 200 30d;
@@ -183,7 +241,11 @@ data:
         location /jetstack/ {
             mirror /mirror-sync;
             mirror_request_body off;
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://charts.jetstack.io/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache charts_cache;
             proxy_cache_valid 200 1d;
@@ -196,7 +258,11 @@ data:
         location /cnpg/ {
             mirror /mirror-sync;
             mirror_request_body off;
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://cloudnative-pg.github.io/charts/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache charts_cache;
             proxy_cache_valid 200 1d;
@@ -209,7 +275,11 @@ data:
         location /hashicorp/ {
             mirror /mirror-sync;
             mirror_request_body off;
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://helm.releases.hashicorp.com/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache charts_cache;
             proxy_cache_valid 200 1d;
@@ -222,7 +292,11 @@ data:
         location /goharbor/ {
             mirror /mirror-sync;
             mirror_request_body off;
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://helm.goharbor.io/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache charts_cache;
             proxy_cache_valid 200 1d;
@@ -235,7 +309,11 @@ data:
         location /prometheus-community/ {
             mirror /mirror-sync;
             mirror_request_body off;
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://prometheus-community.github.io/helm-charts/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache charts_cache;
             proxy_cache_valid 200 1d;
@@ -248,7 +326,11 @@ data:
         location /external-secrets/ {
             mirror /mirror-sync;
             mirror_request_body off;
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://external-secrets.io/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache charts_cache;
             proxy_cache_valid 200 1d;
@@ -261,7 +343,11 @@ data:
         location /autoscaler/ {
             mirror /mirror-sync;
             mirror_request_body off;
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://kubernetes.github.io/autoscaler/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache charts_cache;
             proxy_cache_valid 200 1d;
@@ -274,7 +360,11 @@ data:
         location /ot-helm/ {
             mirror /mirror-sync;
             mirror_request_body off;
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://ot-container-kit.github.io/helm-charts/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache charts_cache;
             proxy_cache_valid 200 1d;
@@ -287,7 +377,11 @@ data:
         location /kasmtech/ {
             mirror /mirror-sync;
             mirror_request_body off;
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://helm.kasmweb.com/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache charts_cache;
             proxy_cache_valid 200 1d;
@@ -300,7 +394,11 @@ data:
         location /gitlab/ {
             mirror /mirror-sync;
             mirror_request_body off;
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://charts.gitlab.io/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache charts_cache;
             proxy_cache_valid 200 1d;
@@ -313,7 +411,11 @@ data:
         location /mariadb-operator/ {
             mirror /mirror-sync;
             mirror_request_body off;
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://mariadb-operator.github.io/mariadb-operator/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache charts_cache;
             proxy_cache_valid 200 1d;
@@ -330,7 +432,11 @@ data:
         server_name go.{{ $domain }};
 
         location / {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://proxy.golang.org;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache go_cache;
             proxy_cache_valid 200 7d;
@@ -341,7 +447,11 @@ data:
         }
 
         location /sumdb/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://sum.golang.org/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache go_cache;
             proxy_cache_valid 200 30d;
@@ -358,7 +468,11 @@ data:
         server_name npm.{{ $domain }};
 
         location / {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://registry.npmjs.org;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache npm_cache;
             proxy_cache_valid 200 7d;
@@ -376,7 +490,11 @@ data:
         server_name pypi.{{ $domain }};
 
         location /simple/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://pypi.org/simple/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache pypi_cache;
             proxy_cache_valid 200 1d;
@@ -386,7 +504,11 @@ data:
         }
 
         location /pypi/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://pypi.org/pypi/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache pypi_cache;
             proxy_cache_valid 200 1d;
@@ -396,7 +518,11 @@ data:
         }
 
         location /packages/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://files.pythonhosted.org/packages/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache pypi_cache;
             proxy_cache_valid 200 30d;
@@ -414,7 +540,11 @@ data:
         server_name maven.{{ $domain }};
 
         location /maven2/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://repo1.maven.org/maven2/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache maven_cache;
             proxy_cache_valid 200 30d;
@@ -425,7 +555,11 @@ data:
         }
 
         location /google/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://maven.google.com/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache maven_cache;
             proxy_cache_valid 200 30d;
@@ -435,7 +569,11 @@ data:
         }
 
         location /gradle-plugins/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://plugins.gradle.org/m2/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache maven_cache;
             proxy_cache_valid 200 30d;
@@ -452,7 +590,11 @@ data:
         server_name crates.{{ $domain }};
 
         location /api/v1/crates/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://index.crates.io/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache crates_cache;
             proxy_cache_valid 200 1d;
@@ -462,7 +604,11 @@ data:
         }
 
         location /api/v1/crates/download/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://static.crates.io/crates/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache crates_cache;
             proxy_cache_valid 200 30d;
@@ -480,7 +626,11 @@ data:
         server_name dl.{{ $domain }};
 
         location /rocky/9/ {
+            {{- if $proxyEnabled }}
+            proxy_pass https://{{ $proxyIP }};
+            {{- else }}
             proxy_pass https://dl.rockylinux.org/pub/rocky/9/;
+            {{- end }}
             include /etc/nginx/includes/proxy-defaults.conf;
             proxy_cache downloads_cache;
             proxy_cache_valid 200 30d;

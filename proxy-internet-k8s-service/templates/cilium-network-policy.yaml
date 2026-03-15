@@ -56,6 +56,17 @@ spec:
               protocol: TCP
             - port: "80"
               protocol: TCP
+    # Allow to upstream proxy VM (internet egress via NAT)
+    {{- if .Values.upstreamProxy.enabled }}
+    - toCIDR:
+        - {{ .Values.upstreamProxy.ip }}/32
+      toPorts:
+        - ports:
+            - port: {{ .Values.upstreamProxy.httpsPort | quote }}
+              protocol: TCP
+            - port: {{ .Values.upstreamProxy.squidPort | quote }}
+              protocol: TCP
+    {{- end }}
     # Allow to MinIO
     - toEndpoints:
         - matchLabels:

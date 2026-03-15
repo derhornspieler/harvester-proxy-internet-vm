@@ -130,6 +130,15 @@ certManager:
   duration: 720h
   renewBefore: 240h
 
+# --- Upstream Proxy VM ---
+# The cluster nodes have no direct internet access. Traffic exits via
+# the proxy VM (172.16.3.200) which has firewall-allowed internet NAT.
+upstreamProxy:
+  enabled: true
+  ip: "172.16.3.200"
+  httpsPort: "443"
+  squidPort: "3128"
+
 # --- Cilium ---
 cilium:
   egressGateway:
