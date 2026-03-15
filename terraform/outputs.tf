@@ -13,9 +13,17 @@ output "proxy_hostnames" {
   value = [
     "yum.${var.domain}",
     "apt.${var.domain}",
+    "apk.${var.domain}",
     "dl.${var.domain}",
     "charts.${var.domain}",
     "bin.${var.domain}",
+    "go.${var.domain}",
+    "npm.${var.domain}",
+    "pypi.${var.domain}",
+    "maven.${var.domain}",
+    "crates.${var.domain}",
+    "harbor.${var.domain}",
+    "proxy.${var.domain}",
   ]
 }
 
@@ -24,7 +32,12 @@ output "registry_url" {
   value       = "${var.static_ip}:5000"
 }
 
+output "squid_proxy" {
+  description = "Squid forward proxy URL"
+  value       = "http://${var.static_ip}:3128"
+}
+
 output "hosts_entry" {
   description = "/etc/hosts line for clients"
-  value       = "${var.static_ip}  yum.${var.domain} apt.${var.domain} dl.${var.domain} charts.${var.domain} bin.${var.domain}"
+  value       = "${var.static_ip}  yum.${var.domain} apt.${var.domain} apk.${var.domain} dl.${var.domain} charts.${var.domain} bin.${var.domain} go.${var.domain} npm.${var.domain} pypi.${var.domain} maven.${var.domain} crates.${var.domain} harbor.${var.domain} proxy.${var.domain}"
 }

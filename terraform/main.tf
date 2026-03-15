@@ -21,7 +21,7 @@ locals {
     }),
   ])
 
-  proxy_hostnames = "yum.${var.domain} apt.${var.domain} dl.${var.domain} charts.${var.domain} bin.${var.domain}"
+  proxy_hostnames = "yum.${var.domain} apt.${var.domain} apk.${var.domain} dl.${var.domain} charts.${var.domain} bin.${var.domain} go.${var.domain} npm.${var.domain} pypi.${var.domain} maven.${var.domain} crates.${var.domain} harbor.${var.domain} proxy.${var.domain}"
 
   # Inline all nginx/registry configs as write_files entries
   write_files = concat(
@@ -75,6 +75,64 @@ locals {
         path    = "/opt/airgap/nginx/conf.d/bin.conf"
         content = file("${path.module}/../nginx/conf.d/bin.conf")
       },
+      {
+        path    = "/opt/airgap/nginx/conf.d/apk.conf"
+        content = file("${path.module}/../nginx/conf.d/apk.conf")
+      },
+      {
+        path    = "/opt/airgap/nginx/conf.d/go.conf"
+        content = file("${path.module}/../nginx/conf.d/go.conf")
+      },
+      {
+        path    = "/opt/airgap/nginx/conf.d/npm.conf"
+        content = file("${path.module}/../nginx/conf.d/npm.conf")
+      },
+      {
+        path    = "/opt/airgap/nginx/conf.d/pypi.conf"
+        content = file("${path.module}/../nginx/conf.d/pypi.conf")
+      },
+      {
+        path    = "/opt/airgap/nginx/conf.d/maven.conf"
+        content = file("${path.module}/../nginx/conf.d/maven.conf")
+      },
+      {
+        path    = "/opt/airgap/nginx/conf.d/crates.conf"
+        content = file("${path.module}/../nginx/conf.d/crates.conf")
+      },
+      {
+        path    = "/opt/airgap/nginx/conf.d/harbor.conf"
+        content = file("${path.module}/../nginx/conf.d/harbor.conf")
+      },
+      # Squid forward proxy
+      {
+        path    = "/opt/airgap/squid/squid.conf"
+        content = file("${path.module}/../squid/squid.conf")
+      },
+      # Helm OCI charts manifest
+      {
+        path    = "/opt/airgap/helm-oci/charts.manifest"
+        content = file("${path.module}/../helm-oci/charts.manifest")
+      },
+      # docker-compose .env
+      {
+        path    = "/opt/airgap/.env"
+        content = "HARBOR_HOST=${var.harbor_host}\nHARBOR_USER=${var.harbor_user}\nHARBOR_PASS=${var.harbor_pass}\n"
+      },
+      # helm-sync build context
+      {
+        path    = "/opt/airgap/helm-sync/Dockerfile"
+        content = file("${path.module}/../helm-sync/Dockerfile")
+      },
+      {
+        path        = "/opt/airgap/helm-sync/helm-sync.sh"
+        content     = file("${path.module}/../helm-sync/helm-sync.sh")
+        permissions = "0755"
+      },
+      {
+        path        = "/opt/airgap/helm-sync/entrypoint.sh"
+        content     = file("${path.module}/../helm-sync/entrypoint.sh")
+        permissions = "0755"
+      },
       # Registry config
       {
         path    = "/opt/airgap/registry/config.yml"
@@ -85,9 +143,9 @@ locals {
         path        = "/etc/docker/daemon.json"
         permissions = "0644"
         content     = jsonencode({
-          bip                  = "192.168.200.1/24"
-          "fixed-cidr"         = "192.168.200.0/24"
-          "default-address-pools" = [{ base = "10.10.0.0/16", size = 24 }]
+          bip                  = "172.100.10.1/24"
+          "fixed-cidr"         = "172.100.10.0/24"
+          "default-address-pools" = [{ base = "172.100.0.0/16", size = 24 }]
           "log-driver"         = "json-file"
           "log-opts"           = { "max-size" = "50m", "max-file" = "3" }
         })
@@ -156,6 +214,12 @@ locals {
 
         # Create bin/data directory (empty — will be populated via scp)
         "mkdir -p /opt/airgap/bin/data",
+
+        # Replace example.com with actual domain in nginx vhost configs
+        "find /opt/airgap/nginx/conf.d -name '*.conf' -exec sed -i 's/example\\.com/${var.domain}/g' {} +",
+
+        # Build helm-sync image
+        "mkdir -p /opt/airgap/helm-sync",
 
         # Start the compose stack
         "cd /opt/airgap && docker compose up -d",

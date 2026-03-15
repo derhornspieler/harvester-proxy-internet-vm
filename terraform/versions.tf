@@ -11,6 +11,6 @@ terraform {
   backend "kubernetes" {
     secret_suffix = "airgap-proxy"
     namespace     = "terraform-state"
-    config_path   = "kubeconfig-harvester.yaml"
+    config_path   = "/home/rocky/code/harvester-rke2-cluster/kubeconfig-harvester.yaml"
   }
 }

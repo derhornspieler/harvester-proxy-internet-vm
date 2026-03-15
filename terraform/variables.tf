@@ -108,3 +108,26 @@ variable "domain" {
   type        = string
   default     = "example.com"
 }
+
+# -----------------------------------------------------------------------------
+# Harbor (for helm-sync)
+# -----------------------------------------------------------------------------
+
+variable "harbor_host" {
+  description = "Harbor registry hostname"
+  type        = string
+  default     = "harbor.example.com"
+}
+
+variable "harbor_user" {
+  description = "Harbor robot account username"
+  type        = string
+  default     = ""
+}
+
+variable "harbor_pass" {
+  description = "Harbor robot account password"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

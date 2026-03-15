@@ -69,10 +69,10 @@ sudo mkdir -p /etc/docker
 if [[ ! -f /etc/docker/daemon.json ]]; then
   cat <<'DAEMON_JSON' | sudo tee /etc/docker/daemon.json >/dev/null
 {
-  "bip": "192.168.200.1/24",
-  "fixed-cidr": "192.168.200.0/24",
+  "bip": "172.100.10.1/24",
+  "fixed-cidr": "172.100.10.0/24",
   "default-address-pools": [
-    { "base": "10.10.0.0/16", "size": 24 }
+    { "base": "172.100.0.0/16", "size": 24 }
   ],
   "log-driver": "json-file",
   "log-opts": {
