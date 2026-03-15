@@ -1,3 +1,4 @@
+{{- if .Values.helmSync.enabled -}}
 {{- $fullname := include "proxy-internet.fullname" . -}}
 apiVersion: apps/v1
 kind: Deployment
@@ -79,3 +80,4 @@ spec:
             name: {{ $fullname }}-charts-manifest
         - name: tmp
           emptyDir: {}
+{{- end }}

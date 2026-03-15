@@ -1,3 +1,4 @@
+{{- if .Values.helmSync.enabled -}}
 {{- $fullname := include "proxy-internet.fullname" . -}}
 apiVersion: v1
 kind: Service
@@ -16,3 +17,4 @@ spec:
   selector:
     {{- include "proxy-internet.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: helm-sync
+{{- end }}

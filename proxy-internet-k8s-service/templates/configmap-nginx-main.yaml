@@ -42,8 +42,8 @@ data:
         types_hash_max_size 2048;
         client_max_body_size 0;
 
-        # Use kube-dns for proxy_pass with variables
-        resolver kube-dns.kube-system.svc.cluster.local valid=30s;
+        # Use cluster DNS IP for proxy_pass with variables
+        resolver {{ .Values.nginx.dnsResolver }} valid=30s;
         resolver_timeout 5s;
 
         # Temp paths for non-root

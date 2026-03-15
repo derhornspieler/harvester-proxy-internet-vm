@@ -34,6 +34,7 @@ nginx:
   replicaCount: 2
   image: nginx:1.27-alpine
   exporterImage: nginx/nginx-prometheus-exporter:1.4
+  dnsResolver: "10.43.0.10"
   resources:
     requests:
       cpu: 200m
@@ -98,11 +99,14 @@ pdb:
     minAvailable: 2
 
 # --- helm-sync ---
+# NOTE: helm-sync requires a custom image (not yet built).
+# Set enabled: false until the image is available.
 helmSync:
+  enabled: false
   replicaCount: 1
   image:
-    repository: ""
-    tag: latest
+    repository: alpine/helm
+    tag: "3.17.1"
     pullPolicy: IfNotPresent
   resources:
     requests:
