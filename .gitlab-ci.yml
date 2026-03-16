@@ -1,15 +1,16 @@
 ---
 # GitLab CI for harvester-proxy-internet-vm
 # Lint + security scan + validate + sync to GitHub
-#
-# NOTE: lint/security/validate stages are disabled (no tags assigned).
-# Only sync-to-github runs automatically on push to main.
 
 stages:
   - lint
   - security
   - validate
   - sync
+
+default:
+  tags:
+    - shared
 
 variables:
   DOMAIN: example.com
