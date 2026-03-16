@@ -195,12 +195,8 @@ argocd-refresh:
 sync-to-github:
   stage: sync
   image: harbor.aegisgroup.ch/docker.io/library/alpine:3.21
-  id_tokens:
-    VAULT_ID_TOKEN:
-      aud: https://gitlab.aegisgroup.ch
   variables:
-    VAULT_SERVER_URL: https://vault.aegisgroup.ch
-    VAULT_AUTH_ROLE: gitlab-ci
+    VAULT_ADDR: https://vault.aegisgroup.ch
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: always
@@ -210,18 +206,24 @@ sync-to-github:
     # Authenticate to Vault via JWT
     - |
       VAULT_TOKEN=$(curl -sk --request POST \
-        "${VAULT_SERVER_URL}/v1/auth/jwt/gitlab/login" \
-        --data "{\"role\":\"${VAULT_AUTH_ROLE}\",\"jwt\":\"${VAULT_ID_TOKEN}\"}" \
-        | jq -r '.auth.client_token')
+        --data "{\"jwt\": \"${CI_JOB_JWT_V2}\", \"role\": \"gitlab-ci\"}" \
+        "${VAULT_ADDR}/v1/auth/jwt/login" | \
+        jq -r '.auth.client_token')
       export VAULT_TOKEN
+      if [ -z "${VAULT_TOKEN}" ] || [ "${VAULT_TOKEN}" = "null" ]; then
+        echo "ERROR: Failed to authenticate to Vault"
+        exit 1
+      fi
     # Fetch GitHub SSH key and mirror URL from Vault
     - |
-      GITHUB_SSH_PRIVATE_KEY=$(curl -sk -H "X-Vault-Token: ${VAULT_TOKEN}" \
-        "${VAULT_SERVER_URL}/v1/kv/data/services/ci/github-mirror-proxy-vm" \
-        | jq -r '.data.data["ssh-private-key"]')
-      GITHUB_MIRROR_URL=$(curl -sk -H "X-Vault-Token: ${VAULT_TOKEN}" \
-        "${VAULT_SERVER_URL}/v1/kv/data/services/ci/github-mirror-proxy-vm" \
-        | jq -r '.data.data["mirror-url"]')
+      VAULT_RESP=$(curl -sk -H "X-Vault-Token: ${VAULT_TOKEN}" \
+        "${VAULT_ADDR}/v1/kv/data/services/ci/github-mirror-proxy-vm")
+      GITHUB_SSH_PRIVATE_KEY=$(echo "$VAULT_RESP" | jq -r '.data.data["ssh-private-key"]')
+      GITHUB_MIRROR_URL=$(echo "$VAULT_RESP" | jq -r '.data.data["mirror-url"]')
+      if [ -z "${GITHUB_MIRROR_URL}" ] || [ "${GITHUB_MIRROR_URL}" = "null" ]; then
+        echo "ERROR: Failed to read GitHub mirror URL from Vault"
+        exit 1
+      fi
     - mkdir -p ~/.ssh
     - echo "$GITHUB_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
