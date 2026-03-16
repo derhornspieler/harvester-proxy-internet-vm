@@ -21,7 +21,7 @@ variables:
 
 shellcheck:
   stage: lint
-  image: harbor.aegisgroup.ch/docker.io/koalaman/shellcheck-stable:latest
+  image: harbor.aegisgroup.ch/docker.io/koalaman/shellcheck:latest
   script:
     - |
       find . -name '*.sh' -not -path './.git/*' -print0 \
