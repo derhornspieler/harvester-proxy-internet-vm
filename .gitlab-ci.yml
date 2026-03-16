@@ -20,7 +20,7 @@ variables:
 
 shellcheck:
   stage: lint
-  image: koalaman/shellcheck-stable:latest
+  image: harbor.aegisgroup.ch/docker.io/koalaman/shellcheck-stable:latest
   script:
     - |
       find . -name '*.sh' -not -path './.git/*' -print0 \
@@ -31,7 +31,7 @@ shellcheck:
 
 hadolint:
   stage: lint
-  image: hadolint/hadolint:latest-alpine
+  image: harbor.aegisgroup.ch/docker.io/hadolint/hadolint:latest-alpine
   script:
     - hadolint helm-sync/Dockerfile
   rules:
@@ -40,7 +40,7 @@ hadolint:
 
 yamllint:
   stage: lint
-  image: alpine:3.21
+  image: harbor.aegisgroup.ch/docker.io/library/alpine:3.21
   before_script:
     - apk add --no-cache yamllint
   script:
@@ -57,7 +57,7 @@ yamllint:
 
 gitleaks:
   stage: security
-  image: zricethezav/gitleaks:latest
+  image: harbor.aegisgroup.ch/docker.io/zricethezav/gitleaks:latest
   script:
     - gitleaks detect --source . --verbose
   rules:
@@ -67,7 +67,7 @@ gitleaks:
 
 semgrep-sast:
   stage: security
-  image: semgrep/semgrep:latest
+  image: harbor.aegisgroup.ch/docker.io/semgrep/semgrep:latest
   script:
     - >-
       semgrep scan
@@ -92,7 +92,7 @@ semgrep-sast:
 
 nginx-config:
   stage: validate
-  image: docker:27
+  image: harbor.aegisgroup.ch/docker.io/library/docker:27
   services:
     - docker:27-dind
   variables:
@@ -118,7 +118,7 @@ nginx-config:
 
 docker-compose:
   stage: validate
-  image: docker:27
+  image: harbor.aegisgroup.ch/docker.io/library/docker:27
   services:
     - docker:27-dind
   variables:
@@ -134,7 +134,7 @@ docker-compose:
 
 helm-lint:
   stage: validate
-  image: alpine/helm:3.17.1
+  image: harbor.aegisgroup.ch/docker.io/alpine/helm:3.17.1
   script:
     - helm lint chart/
     - helm template test chart/ > /dev/null
@@ -154,7 +154,7 @@ argocd-refresh:
   stage: sync
   rules:
     - when: never  # Disabled until ArgoCD deployment is ready
-  image: alpine:3.21
+  image: harbor.aegisgroup.ch/docker.io/library/alpine:3.21
   id_tokens:
     VAULT_ID_TOKEN:
       aud: https://gitlab.aegisgroup.ch
@@ -193,7 +193,7 @@ argocd-refresh:
 # Vault path: kv/services/ci/github-mirror-proxy-vm (ssh-private-key, mirror-url)
 sync-to-github:
   stage: sync
-  image: docker.io/alpine:3.21
+  image: harbor.aegisgroup.ch/docker.io/library/alpine:3.21
   id_tokens:
     VAULT_ID_TOKEN:
       aud: https://gitlab.aegisgroup.ch
