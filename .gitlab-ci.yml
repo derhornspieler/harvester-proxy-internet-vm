@@ -195,6 +195,9 @@ argocd-refresh:
 sync-to-github:
   stage: sync
   image: harbor.aegisgroup.ch/docker.io/library/alpine:3.21
+  id_tokens:
+    VAULT_JWT:
+      aud: https://gitlab.aegisgroup.ch
   variables:
     VAULT_ADDR: http://vault.vault.svc.cluster.local:8200
   rules:
@@ -205,8 +208,8 @@ sync-to-github:
     - pip install git-filter-repo --break-system-packages 2>/dev/null
     # Authenticate to Vault via JWT
     - |
-      VAULT_TOKEN=$(curl -sk --request POST \
-        --data "{\"jwt\": \"${CI_JOB_JWT_V2}\", \"role\": \"gitlab-ci\"}" \
+      VAULT_TOKEN=$(curl -s --request POST \
+        --data "{\"jwt\": \"${VAULT_JWT}\", \"role\": \"gitlab-ci\"}" \
         "${VAULT_ADDR}/v1/auth/jwt/login" | \
         jq -r '.auth.client_token')
       export VAULT_TOKEN
