@@ -198,16 +198,38 @@ argocd-refresh:
 # ---------------------------------------------------------------------------
 # Replaces PII (domain, usernames, org, IPs) with generic placeholders and
 # removes sensitive files before pushing to the public GitHub mirror.
-# Requires CI variables: GITHUB_SSH_PRIVATE_KEY, GITHUB_MIRROR_URL
+# Credentials fetched from Vault via JWT auth — no CI variables needed.
+# Vault path: kv/services/ci/github-mirror-proxy-vm (ssh-private-key, mirror-url)
 sync-to-github:
   stage: sync
   image: docker.io/alpine:3.21
+  id_tokens:
+    VAULT_ID_TOKEN:
+      aud: https://gitlab.aegisgroup.ch
+  variables:
+    VAULT_SERVER_URL: https://vault.aegisgroup.ch
+    VAULT_AUTH_ROLE: gitlab-ci
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: always
   before_script:
-    - apk add --no-cache git openssh-client python3 py3-pip
+    - apk add --no-cache git openssh-client python3 py3-pip curl jq
     - pip install git-filter-repo --break-system-packages 2>/dev/null
+    # Authenticate to Vault via JWT
+    - |
+      VAULT_TOKEN=$(curl -sk --request POST \
+        "${VAULT_SERVER_URL}/v1/auth/jwt/gitlab/login" \
+        --data "{\"role\":\"${VAULT_AUTH_ROLE}\",\"jwt\":\"${VAULT_ID_TOKEN}\"}" \
+        | jq -r '.auth.client_token')
+      export VAULT_TOKEN
+    # Fetch GitHub SSH key and mirror URL from Vault
+    - |
+      GITHUB_SSH_PRIVATE_KEY=$(curl -sk -H "X-Vault-Token: ${VAULT_TOKEN}" \
+        "${VAULT_SERVER_URL}/v1/kv/data/services/ci/github-mirror-proxy-vm" \
+        | jq -r '.data.data["ssh-private-key"]')
+      GITHUB_MIRROR_URL=$(curl -sk -H "X-Vault-Token: ${VAULT_TOKEN}" \
+        "${VAULT_SERVER_URL}/v1/kv/data/services/ci/github-mirror-proxy-vm" \
+        | jq -r '.data.data["mirror-url"]')
     - mkdir -p ~/.ssh
     - echo "$GITHUB_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
