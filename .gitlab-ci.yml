@@ -151,7 +151,9 @@ helm-lint:
 # Credentials sourced from Vault (kv/ci/argocd) via GitLab JWT auth.
 
 argocd-refresh:
-  stage: deploy
+  stage: sync
+  rules:
+    - when: never  # Disabled until ArgoCD deployment is ready
   image: alpine:3.21
   id_tokens:
     VAULT_ID_TOKEN:
@@ -181,17 +183,6 @@ argocd-refresh:
         -H "Authorization: Bearer ${ARGOCD_TOKEN}" \
         -o /dev/null
     - echo "ArgoCD ApplicationSet refresh triggered"
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  needs:
-    - nginx-config
-    - docker-compose
-    - helm-lint
-    - shellcheck
-    - hadolint
-    - yamllint
-    - gitleaks
-    - semgrep-sast
 
 # ---------------------------------------------------------------------------
 # Sync: Sanitized push to GitHub mirror (on push to main)
