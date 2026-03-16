@@ -196,7 +196,7 @@ sync-to-github:
   stage: sync
   image: harbor.aegisgroup.ch/docker.io/library/alpine:3.21
   variables:
-    VAULT_ADDR: https://vault.aegisgroup.ch
+    VAULT_ADDR: http://vault.vault.svc.cluster.local:8200
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
       when: always
