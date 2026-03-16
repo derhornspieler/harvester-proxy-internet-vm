@@ -24,8 +24,16 @@ certs/*.srl
 env/*.env
 !env/*.env.example
 
-# Claude Code
+# AI coding assistants (agents, memory, settings — local dev tools)
 .claude/
+CLAUDE.md
+.claude-*
+claude-*
+agent-memory*/
 
-# Design docs (generated per-session)
+# Project memory (local context)
+memory/
+
+# Design/planning docs (local only)
 docs/plans/
+docs/superpowers/

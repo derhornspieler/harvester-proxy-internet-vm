@@ -1,19 +1,15 @@
 ---
 # GitLab CI for harvester-proxy-internet-vm
-# Lint + security scan + validate + ArgoCD deployment
+# Lint + security scan + validate + sync to GitHub
 #
-# DISABLED: Pipeline is paused while transitioning from VM-based deployment
-# to proxy-internet-k8s-service. Remove the workflow block below to re-enable.
-
-workflow:
-  rules:
-    - when: never
+# NOTE: lint/security/validate stages are disabled (no tags assigned).
+# Only sync-to-github runs automatically on push to main.
 
 stages:
   - lint
   - security
   - validate
-  - deploy
+  - sync
 
 variables:
   DOMAIN: example.com
@@ -196,3 +192,83 @@ argocd-refresh:
     - yamllint
     - gitleaks
     - semgrep-sast
+
+# ---------------------------------------------------------------------------
+# Sync: Sanitized push to GitHub mirror (on push to main)
+# ---------------------------------------------------------------------------
+# Replaces PII (domain, usernames, org, IPs) with generic placeholders and
+# removes sensitive files before pushing to the public GitHub mirror.
+# Requires CI variables: GITHUB_SSH_PRIVATE_KEY, GITHUB_MIRROR_URL
+sync-to-github:
+  stage: sync
+  image: docker.io/alpine:3.21
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+      when: always
+  before_script:
+    - apk add --no-cache git openssh-client python3 py3-pip
+    - pip install git-filter-repo --break-system-packages 2>/dev/null
+    - mkdir -p ~/.ssh
+    - echo "$GITHUB_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+    - chmod 600 ~/.ssh/id_ed25519
+    - ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+    - git config --global user.name "GitLab Mirror"
+    - git config --global user.email "mirror@ci.local"
+  script:
+    - |
+      WORK_DIR="/tmp/github-sanitize"
+      rm -rf "${WORK_DIR}"
+
+      # Clone the full repo
+      git clone --branch main "${CI_REPOSITORY_URL}" "${WORK_DIR}"
+      cd "${WORK_DIR}"
+
+      # Create PII replacement map
+      cat > /tmp/replacements.txt << 'REPLACEMENTS'
+      aegisgroup.ch==>example.com
+      Aegis Group==>Example Org
+      alice.morgan==>admin.user
+      Alice Morgan==>Platform Admin
+      frank.jones==>dev.user
+      Frank Jones==>Senior Developer
+      172.16.3.200==>10.0.0.100
+      192.168.48.2==>10.0.0.200
+      192.168.48.4==>10.0.0.201
+      Harbor12345==>CHANGEME
+      REPLACEMENTS
+
+      # Pass 1: Replace PII in file content + remove sensitive files
+      git filter-repo \
+        --replace-text /tmp/replacements.txt \
+        --path-glob 'scripts/github-sanitize.sh' --invert-paths \
+        --path-glob '.gitlab-ci.yml' --invert-paths \
+        --path-glob 'certs/*.pem' --invert-paths \
+        --path-glob 'certs/*.srl' --invert-paths \
+        --path-glob 'terraform/terraform.tfvars' --invert-paths \
+        --path-glob '.env' --invert-paths \
+        --path-glob '.claude/' --invert-paths \
+        --path-glob 'CLAUDE.md' --invert-paths \
+        --path-glob 'memory/' --invert-paths \
+        --path-glob 'docs/plans/' --invert-paths \
+        --path-glob 'docs/superpowers/' --invert-paths \
+        --force
+
+      # Pass 2: Replace PII in commit messages
+      git filter-repo \
+        --message-callback '
+      msg = message
+      msg = msg.replace(b"aegisgroup.ch", b"example.com")
+      msg = msg.replace(b"Aegis Group", b"Example Org")
+      msg = msg.replace(b"alice.morgan", b"admin.user")
+      msg = msg.replace(b"Alice Morgan", b"Platform Admin")
+      msg = msg.replace(b"frank.jones", b"dev.user")
+      msg = msg.replace(b"Frank Jones", b"Senior Developer")
+      msg = msg.replace(b"172.16.3.200", b"10.0.0.100")
+      msg = msg.replace(b"Harbor12345", b"CHANGEME")
+      return msg
+      ' --force
+
+      # Force push sanitized history to GitHub
+      git remote add github "${GITHUB_MIRROR_URL}"
+      git push github main --force --tags
+  allow_failure: true
