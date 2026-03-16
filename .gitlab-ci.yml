@@ -228,6 +228,7 @@ sync-to-github:
     - ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
     - git config --global user.name "GitLab Mirror"
     - git config --global user.email "mirror@ci.local"
+    - git config --global http.sslVerify false
   script:
     - |
       WORK_DIR="/tmp/github-sanitize"
